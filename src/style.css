@@ -1,0 +1,98 @@
+@font-face {
+  font-family: 'Ubuntu';
+  src: url('/fonts/Ubuntu-Light.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+:root {
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 300;
+  color: #000;
+  background: #fff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { position: relative; width: 100%; height: 100svh; overflow: hidden; background: #fff; }
+.project-title {
+  position: absolute;
+  z-index: 2;
+  top: max(32px, env(safe-area-inset-top));
+  left: max(24px, env(safe-area-inset-left));
+  width: clamp(150px, 14.6vw, 219px);
+  margin: 0;
+  font-weight: 300;
+  line-height: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.project-title svg { display: block; width: 100%; height: auto; fill: #000; transform: scaleX(1.1); transform-origin: left center; }
+#scene { position: absolute; inset: 0; }
+canvas { display: block; touch-action: none; }
+.help-indicator {
+  position: absolute;
+  top: max(32px, env(safe-area-inset-top));
+  right: max(24px, env(safe-area-inset-right));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1pt solid #000;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+  user-select: none;
+}
+.help-indicator span { display: block; font-family: 'OCR B Std', 'ocr-b-std', monospace; font-weight: 400; transform: scaleX(1.1); }
+.help-indicator:hover { background: #000; color: #fff; }
+.help-indicator:focus-visible { outline: 2px solid #888; outline-offset: 4px; }
+.tutorial {
+  position: fixed;
+  inset: auto;
+  top: calc(max(32px, env(safe-area-inset-top)) + 58px);
+  right: max(24px, env(safe-area-inset-right));
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100svh - max(32px, env(safe-area-inset-top)) - 78px);
+  margin: 0;
+  padding: 28px;
+  border: 1pt solid #000;
+  border-radius: 25px;
+  outline: none;
+  background: rgb(255 255 255 / 95%);
+  color: #000;
+  font: inherit;
+  text-align: center;
+  overflow-y: auto;
+}
+.tutorial::backdrop { background: transparent; }
+.tutorial[open] { display: flex; align-items: safe center; justify-content: center; }
+.tutorial-copy { width: 100%; min-width: 0; }
+.tutorial p { width: calc(100% / 1.1); margin: 0 auto; font-size: 13px; line-height: 1.7; overflow-wrap: break-word; transform: scaleX(1.1); }
+.tutorial-action + .tutorial-action { margin-top: 28px; }
+.tutorial-pictures { display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 14px; min-height: 80px; }
+.tutorial-pictures img { display: block; width: 72px; height: 54px; object-fit: contain; }
+.tutorial-mouse { width: 48px; }
+.tutorial-mouse svg { display: block; width: 100%; height: auto; }
+.tutorial[data-device="touch"] .tutorial-pictures { display: none; }
+.tutorial p:lang(en) { letter-spacing: 0.05em; }
+.tutorial .tutorial-hint { margin-top: 32px; font-family: Gulim, '굴림', sans-serif; font-weight: 400; font-size: 13px; word-break: keep-all; line-height: 1.5; }
+.tutorial .tutorial-hint-en { margin-top: 0; font-size: 11px; line-height: 1.5; }
+@media (max-width: 600px) {
+  .project-title, .help-indicator { top: max(24px, env(safe-area-inset-top)); }
+  .project-title { left: max(16px, env(safe-area-inset-left)); }
+  .help-indicator { right: max(16px, env(safe-area-inset-right)); }
+  .tutorial { top: calc(max(24px, env(safe-area-inset-top)) + 58px); right: max(16px, env(safe-area-inset-right)); padding: 24px; }
+  .tutorial p { font-size: 13px; }
+  .tutorial .tutorial-hint { font-size: 13px; }
+}
