@@ -16,6 +16,10 @@ interface Meal {
   age: number
 }
 
+interface FeedArea { x: number; z: number; grains: Grain[]; reserved: number }
+const areaSize = 1.6
+const areaKey = (x: number, z: number) => `${Math.floor(x / areaSize)},${Math.floor(z / areaSize)}`
+
 export class Feeding {
   readonly grains: Grain[] = []
   readonly meals = new Map<Pigeon, Meal>()
@@ -24,7 +28,10 @@ export class Feeding {
   private searches = new WeakMap<Pigeon, number>()
   private dirty = true
   private dummy = new THREE.Object3D()
-  private capacity = 3000
+  private grainColor = new THREE.Color()
+  private capacity = 4000
+  private areas = new Map<string, FeedArea>()
+  private areaTimer = 0
 
   constructor(scene: THREE.Scene) {
     this.mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 5),
@@ -45,7 +52,7 @@ export class Feeding {
       const height = 1.4 + Math.random() * 0.6
       const velocityY = 1.4 + Math.random() * 1.2
       this.grains.push({
-        x: THREE.MathUtils.clamp(x + Math.cos(angle) * radius * 0.7, -boundsX, boundsX),
+        x: THREE.MathUtils.clamp(x + Math.cos(angle) * radius * 0.49, -boundsX, boundsX),
         z: THREE.MathUtils.clamp(z + Math.sin(angle) * radius, minZ, boundsZ),
         bites: 4, size: 0.8 + Math.random() * 0.6, angle: Math.random() * Math.PI, owner: null,
         startX: x, startZ: z, height, velocityY, age: 0,
@@ -57,7 +64,11 @@ export class Feeding {
 
   cancel(bird: Pigeon) {
     const meal = this.meals.get(bird)
-    if (meal) meal.grain.owner = null
+    if (meal) {
+      meal.grain.owner = null
+      const area = this.areas.get(areaKey(meal.grain.x, meal.grain.z))
+      if (area) area.reserved = Math.max(0, area.reserved - 1)
+    }
     this.meals.delete(bird)
     this.controlled.delete(bird)
   }
@@ -70,26 +81,68 @@ export class Feeding {
       grain.startZ = THREE.MathUtils.clamp(grain.startZ, minZ, boundsZ)
     }
     this.dirty = true
+    this.areaTimer = 0
+  }
+
+  private refreshAreas(dt: number) {
+    this.areaTimer -= dt
+    if (this.areaTimer > 0) return
+    this.areaTimer = 0.25
+    this.areas.clear()
+    for (const grain of this.grains) {
+      if (grain.bites <= 0 || grain.age < grain.flightTime) continue
+      const key = areaKey(grain.x, grain.z)
+      let area = this.areas.get(key)
+      if (!area) {
+        area = { x: (Math.floor(grain.x / areaSize) + 0.5) * areaSize,
+          z: (Math.floor(grain.z / areaSize) + 0.5) * areaSize, grains: [], reserved: 0 }
+        this.areas.set(key, area)
+      }
+      area.grains.push(grain)
+      if (grain.owner !== null) area.reserved++
+    }
   }
 
   private findMeal(bird: Pigeon, boundsX: number, boundsZ: number) {
     const limits = getMovementBounds(bird, boundsX, boundsZ)
     const pos = bird.root.position
-    let best: Meal | null = null, nearest = 8 * 8
-    for (const grain of this.grains) {
-      if (grain.bites <= 0 || grain.owner !== null || grain.age < grain.flightTime) continue
-      const dx = pos.x - grain.x, dz = pos.z - grain.z
-      const distance = dx * dx + dz * dz
-      if (distance >= nearest) continue
-      const angle = Math.atan2(dx, dz)
-      const reach = bird.root.scale.y * (bird.style === 'walker' ? 1.36 : 0.88)
-      const x = grain.x + Math.sin(angle) * reach, z = grain.z + Math.cos(angle) * reach
-      if (x < limits.minX || x > limits.maxX || z < limits.minZ || z > limits.maxZ) continue
-      if ([...this.meals.values()].some(meal => Math.hypot(meal.x - x, meal.z - z) < 0.85)) continue
-      nearest = distance
-      best = { grain, x, z, mode: 'wait', timer: Math.random() * 2, biteTimer: 0.3, age: 0 }
+    // Assign under-served stretches first, including stretches across the screen.
+    // Reservations count birds already approaching, not just birds eating there.
+    const ranked = Array.from(this.areas.values(), area => {
+      let neighbors = 0
+      for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) {
+        if (ix === 0 && iz === 0) continue
+        neighbors += this.areas.get(areaKey(area.x + ix * areaSize, area.z + iz * areaSize))?.reserved ?? 0
+      }
+      const distance = Math.hypot(pos.x - area.x, pos.z - area.z)
+      return { area, score: area.reserved * 4 + neighbors * 0.8 + distance * 0.18 }
+    }).sort((a, b) => a.score - b.score)
+    const reach = bird.root.scale.y * (bird.style === 'walker' ? 1.36 : 0.88)
+    for (const { area } of ranked) {
+      let attempts = 0
+      for (const grain of area.grains) {
+        if (grain.bites <= 0 || grain.owner !== null) continue
+        // Dense piles need only a bounded sample of possible standing positions.
+        if (attempts++ >= 32) break
+        const angle = Math.atan2(pos.x - grain.x, pos.z - grain.z)
+        // Several approach sides prevent a single crowded approach from making
+        // the remaining grain seem unreachable, especially at screen edges.
+        for (const offset of [0, -Math.PI / 3, Math.PI / 3, -2 * Math.PI / 3, 2 * Math.PI / 3, Math.PI]) {
+          const x = grain.x + Math.sin(angle + offset) * reach
+          const z = grain.z + Math.cos(angle + offset) * reach
+          if (x < limits.minX || x > limits.maxX || z < limits.minZ || z > limits.maxZ) continue
+          let blocked = false
+          for (const meal of this.meals.values()) {
+            if ((meal.x - x) ** 2 + (meal.z - z) ** 2 < 0.85 ** 2) { blocked = true; break }
+          }
+          if (blocked) continue
+          grain.owner = bird.id
+          area.reserved++
+          this.meals.set(bird, { grain, x, z, mode: 'wait', timer: Math.random() * 2, biteTimer: 0.3, age: 0 })
+          return
+        }
+      }
     }
-    if (best) { best.grain.owner = bird.id; this.meals.set(bird, best) }
   }
 
   update(birds: Pigeon[], held: Pigeon | null, boundsX: number, boundsZ: number, dt: number) {
@@ -98,12 +151,13 @@ export class Feeding {
       grain.age = Math.min(grain.flightTime, grain.age + dt)
       this.dirty = true
     }
+    this.refreshAreas(dt)
     this.controlled.clear()
     for (const bird of birds) {
       const limits = getMovementBounds(bird, boundsX, boundsZ)
       if (bird === held || bird.root.position.y > 0) { this.cancel(bird); continue }
       let meal = this.meals.get(bird)
-      if (meal && (meal.grain.bites <= 0 || meal.age > 16 || meal.x < limits.minX || meal.x > limits.maxX || meal.z < limits.minZ || meal.z > limits.maxZ)) {
+      if (meal && (meal.grain.bites <= 0 || meal.age > 30 || meal.x < limits.minX || meal.x > limits.maxX || meal.z < limits.minZ || meal.z > limits.maxZ)) {
         this.cancel(bird); meal = undefined
       }
       if (!meal) {
@@ -188,7 +242,7 @@ export class Feeding {
       this.dummy.scale.set(0.042 * size, 0.028 * size, 0.09 * size)
       this.dummy.updateMatrix()
       this.mesh.setMatrixAt(index, this.dummy.matrix)
-      this.mesh.setColorAt(index, new THREE.Color().setHSL(0.105 + grain.size * 0.02, 0.48, 0.43 + grain.size * 0.12))
+      this.mesh.setColorAt(index, this.grainColor.setHSL(0.105 + grain.size * 0.02, 0.48, 0.43 + grain.size * 0.12))
       index++
     }
     this.mesh.count = index

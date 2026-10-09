@@ -3,13 +3,14 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 
 // Accessories use existing body/head joints and are batched with their parent.
 export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Group[]) {
-  const plastic = new THREE.MeshStandardMaterial({ color: '#fffaf0', roughness: 0.32 })
+  const plastic = new THREE.MeshStandardMaterial({ color: '#86c9ec', roughness: 0.36 })
+  const plasticEdge = new THREE.MeshStandardMaterial({ color: '#68a8c8', roughness: 0.42 })
   const blue = new THREE.MeshStandardMaterial({ color: '#97c6df', roughness: 0.28 })
   const cotton = new THREE.MeshStandardMaterial({ color: '#fffdf5', roughness: 0.98 })
   const mint = new THREE.MeshStandardMaterial({ color: '#b1dfd9', roughness: 0.93 })
   const seam = new THREE.MeshStandardMaterial({ color: '#e4e9df', roughness: 1 })
   const marking = new THREE.MeshStandardMaterial({ color: '#464b51', roughness: 0.85 })
-  const mesh = (parent: THREE.Group, geometry: THREE.BufferGeometry, mat: THREE.Material) => {
+  const mesh = (parent: THREE.Group, geometry: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[]) => {
     // Extruded shields and rounded parts need matching indexing for batching.
     const indexed = geometry.index ? geometry : mergeVertices(geometry)
     if (indexed !== geometry) geometry.dispose()
@@ -30,7 +31,7 @@ export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Gro
   const pacifier = new THREE.Group()
   pacifier.name = 'baby-pacifier'
   head.add(pacifier)
-  // A white shield with two real ventilation holes and a blue central button.
+  // Sky-blue shield and handle, with softly shaded bevels and ventilation holes.
   const shield = new THREE.Shape()
   shield.moveTo(0, 0.13)
   shield.bezierCurveTo(-0.07, 0.21, -0.24, 0.18, -0.23, 0.015)
@@ -44,7 +45,7 @@ export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Gro
   mesh(pacifier, new THREE.ExtrudeGeometry(shield, {
     depth: 0.027, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008,
     bevelSegments: 2, curveSegments: 12,
-  }), plastic).position.set(0, 1.68, 0.91)
+  }), [plastic, plasticEdge]).position.set(0, 1.68, 0.91)
   oval(pacifier, blue, [0, 1.675, 0.975], [0.114, 0.112, 0.065])
   const handle = mesh(pacifier, new THREE.TorusGeometry(0.153, 0.021, 8, 28), plastic)
   handle.position.set(0, 1.59, 1.045)
