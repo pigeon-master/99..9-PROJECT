@@ -5,7 +5,18 @@ import { EggFocus } from '../src/egg-focus.ts'
 import { pickSceneTarget } from '../src/picking.ts'
 import { fragmentBottom } from '../src/egg-fragments.ts'
 
-for (const style of ['gyaru', 'baby', 'walker', 'royal']) {
+function assertChickClearance(focus) {
+  const chick = focus.scene.getObjectByName('royal-hatchling')
+  if (!chick) return
+  focus.scene.updateMatrixWorld(true)
+  const body = new THREE.Box3().setFromObject(chick, true)
+  for (const piece of focus.scene.getObjectByName('egg-fragments').children) {
+    const shell = new THREE.Box3().setFromObject(piece, true)
+    assert.ok(shell.max.x < body.min.x || shell.min.x > body.max.x, 'Falling shell never overlaps the chick silhouette')
+  }
+}
+
+for (const style of ['gyaru', 'magic', 'maid', 'baby', 'walker', 'royal']) {
 const scene = new THREE.Scene()
 const effects = new HoldEffects(scene)
 const body = new THREE.Group()
@@ -90,12 +101,19 @@ focus.update(1)
 assert.equal(focus.hitCount, 3, 'Damage survives closing and reopening')
 focus.crack(new THREE.Vector2(0, 0))
 assert.ok(focus.broken && focus.hitCount === 4)
+assertChickClearance(focus)
 assert.equal(egg.mesh.userData.parentStyle, style, 'Egg remembers which special bird laid it')
 assert.equal(Boolean(focus.scene.getObjectByName('royal-hatchling')), style === 'royal', 'Only the royal egg hatches this newborn')
 if (style === 'royal') {
   const chick = focus.scene.getObjectByName('royal-hatchling')
   assert.ok(chick.getObjectByName('royal-crown'))
   assert.equal(chick.getObjectByName('royal-armor'), undefined)
+  focus.scene.updateMatrixWorld(true)
+  for (const point of [new THREE.Vector3(0, 0.24, 0), new THREE.Vector3(0, 0.85, 0.1), new THREE.Vector3(0.13, 0.28, 0)]) {
+    const projected = chick.localToWorld(point).project(focus.camera)
+    assert.ok(focus.hitHatchling(new THREE.Vector2(projected.x, projected.y)), 'Body, crown and wing share the same hover/click target')
+  }
+  assert.equal(focus.hitHatchling(new THREE.Vector2(0.99, -0.99)), false)
 }
 assert.ok(focus.background.amount > 0.99, 'Background has faded while the egg is focused')
 const stage = focus.floorMesh.getWorldPosition(new THREE.Vector3())
@@ -104,10 +122,12 @@ focus.floorMesh.getWorldPosition(stage)
 assert.ok(Math.abs(stage.y + 0.2) < 0.01, 'Transparent floor is just below screen center')
 const pieces = focus.scene.getObjectByName('egg-fragments').children
 assert.ok(pieces.length >= 5 && pieces.length <= 8, 'Fourth click splits the real shell into several pieces')
+if (style === 'royal') assert.equal(pieces.length, 8, 'Royal chick has two additional shell pieces')
 const before = pieces.map(piece => piece.position.clone())
 focus.update(0.4)
+assertChickClearance(focus)
 assert.ok(pieces.every((piece, i) => piece.position.distanceTo(before[i]) > 0.01), 'Shell pieces move apart')
-for (let i = 0; i < 350; i++) focus.update(0.01)
+for (let i = 0; i < 350; i++) { focus.update(0.01); assertChickClearance(focus) }
 assert.ok(focus.fragments.every(fragment => fragment.settled), 'Every fragment settles on the transparent stage')
 for (const fragment of focus.fragments) {
   assert.ok(Math.abs(fragment.mesh.position.y + fragmentBottom(fragment) - focus.floorHeight) < 1e-5, 'Fragments rest exactly on the floor without floating or sinking')
@@ -120,6 +140,22 @@ pieces.forEach((piece, i) => { assert.deepEqual(piece.position, resting[i].p); a
 const thirdCount = focus.hitCount
 focus.crack()
 assert.equal(focus.hitCount, thirdCount, 'Broken egg cannot spawn repeated fragments')
+if (style === 'royal') {
+  focus.greet()
+  const chick = focus.scene.getObjectByName('royal-hatchling')
+  for (let i = 0; i < 7; i++) focus.update(0.05)
+  assert.ok(chick.getObjectByName('hatchling-torso').rotation.x > 0.1, 'Chick stands with a stooped waist first')
+  assert.equal(chick.getObjectByName('hatchling-lower-beak').rotation.x, 0, 'Beak stays shut during the stand')
+  assert.equal(focus.greetingReady, false, 'Greeting waits until both movements finish')
+  for (let i = 0; i < 7; i++) focus.update(0.05)
+  assert.ok(chick.getObjectByName('hatchling-lower-beak').rotation.x > 0.1, 'Beak opens after the stand')
+  assert.equal(focus.greetingReady, false)
+  for (let i = 0; i < 4; i++) focus.update(0.05)
+  assert.equal(focus.greetingReady, true)
+  assert.ok(Math.abs(chick.rotation.y + 0.8) < 0.001, 'Greeting turns to a three-quarter view while rising')
+  assert.ok(chick.getObjectByName('hatchling-head').rotation.x < -0.8, 'Raised head counters the stooped torso to show the open beak')
+  assertChickClearance(focus)
+}
 focus.close()
 assert.ok(!egg.mesh.visible && !egg.selected && !egg.mesh.parent, 'Closing a shattered egg does not restore an intact egg')
 const remains = scene.getObjectByName('ground-egg-fragments')

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { Egg } from './hold-effects'
 import { createEggFragments, beginFragmentFall, updateFragmentFall, type ShellFragment } from './egg-fragments.ts'
 import { FocusBackground, eggFlightDuration } from './focus-background.ts'
-import { createRoyalHatchling } from './hatchling.ts'
+import { createRoyalHatchling, updateRoyalHatchlingGreeting } from './hatchling.ts'
 
 // Camera-space presentation keeps the egg centered on resize and prevents the
 // enlarged shell from intersecting the floor or the flock behind it.
@@ -25,6 +25,7 @@ export class EggFocus {
   private floorHeight = 0
   private hatchling: THREE.Group | null = null
   private hatchAge = 0
+  private greetingAge: number | null = null
   private hatchScale = 0.35
   private floorRoot: THREE.Group | null = null
   private floorMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShadowMaterial> | null = null
@@ -32,6 +33,24 @@ export class EggFocus {
   private growingCracks: Array<{ group: THREE.Group; age: number }> = []
   get broken() { return this.fragmentRoot !== null }
   get hitCount() { return Number(this.egg?.mesh.userData.hits ?? 0) }
+  get awaitingJuniorClick() { return this.hatchling !== null && this.greetingAge === null }
+  get greetingReady() { return this.greetingAge !== null && this.greetingAge >= 0.85 }
+
+  hitHatchling(pointer: THREE.Vector2) {
+    if (!this.hatchling) return false
+    this.scene.updateMatrixWorld(true)
+    this.camera.updateMatrixWorld(true)
+    const ray = new THREE.Raycaster()
+    ray.setFromCamera(pointer, this.camera)
+    // Treat the whole chick and its crown as one target, including the small
+    // gaps between crown points, thin wings, and sparse down.
+    const bounds = new THREE.Box3().setFromObject(this.hatchling).expandByScalar(0.02)
+    return ray.ray.intersectsBox(bounds)
+  }
+
+  greet() {
+    if (this.awaitingJuniorClick) this.greetingAge = 0
+  }
 
   constructor() {
     this.camera.position.z = 10
@@ -126,6 +145,10 @@ export class EggFocus {
         // The chick is already full-sized inside the egg; only the shell moves
         // away to reveal it. Keep a small idle sway without changing its size.
         this.hatchling.rotation.z = Math.sin(this.hatchAge * 3) * 0.025
+        if (this.greetingAge !== null) {
+          this.greetingAge += Math.min(dt, 0.05)
+          updateRoyalHatchlingGreeting(this.hatchling, this.greetingAge)
+        }
       }
       this.fragmentRoot.position.copy(this.shell.position)
       this.fragmentRoot.scale.copy(this.shell.scale)
@@ -184,8 +207,10 @@ export class EggFocus {
     this.growingCracks.push({ group: visibleCracks, age: 0 })
     if (this.hitCount === 4) {
       const patches = createEggFragments(this.shell.geometry, this.focusedMaterial!, impact)
+      const keptPieces = this.egg.mesh.userData.parentStyle === 'royal'
+        ? [0, 1, 2, 4, 6, 7, 9, 11] : [0, 2, 4, 7, 9, 11]
       this.fragments = patches.filter((fragment, index) => {
-        if ([0, 2, 4, 7, 9, 11].includes(index)) return true
+        if (keptPieces.includes(index)) return true
         fragment.mesh.geometry.dispose()
         return false
       })
@@ -213,16 +238,41 @@ export class EggFocus {
       if (this.egg.mesh.userData.parentStyle === 'royal') {
         this.hatchling = createRoyalHatchling()
         this.hatchAge = 0
+        this.greetingAge = null
         this.hatchScale = Math.min(0.35, 0.95 / (1.2 * this.shell.scale.y))
         this.hatchling.position.set(0, this.floorHeight, 0.14)
         this.hatchling.scale.setScalar(this.hatchScale)
         this.floorRoot.add(this.hatchling)
-        // The newborn occupies the center; the shell halves fall around it.
+        // Reserve the chick's complete silhouette in both resting and greeting
+        // poses. Shell pieces stay to either side, even while they tumble.
+        const newbornBounds = new THREE.Box3()
+        for (const age of [0, 0.35, 0.55, 0.85]) {
+          updateRoyalHatchlingGreeting(this.hatchling, age)
+          this.hatchling.updateWorldMatrix(true, true)
+          newbornBounds.union(new THREE.Box3().setFromObject(this.hatchling, true))
+        }
+        updateRoyalHatchlingGreeting(this.hatchling, 0)
+        const clearance = Math.max(Math.abs(newbornBounds.min.x), Math.abs(newbornBounds.max.x)) + 0.025
+        const halfWidth = this.aspect / this.shell.scale.x
         this.fragments.forEach((fragment, i) => {
           const a = i * 2.39996
-          fragment.mesh.geometry.scale(0.65, 0.65, 0.65)
-          fragment.velocity.x += Math.cos(a) * 0.08
-          fragment.velocity.z += Math.sin(a) * 0.08
+          fragment.mesh.geometry.scale(0.5, 0.5, 0.5)
+          fragment.mesh.geometry.computeBoundingSphere()
+          let radius = fragment.mesh.geometry.boundingSphere!.radius + fragment.mesh.geometry.boundingSphere!.center.length()
+          const maxRadius = Math.max(0.03, (halfWidth - clearance - 0.035) / 2)
+          if (radius > maxRadius) {
+            fragment.mesh.geometry.scale(maxRadius / radius, maxRadius / radius, maxRadius / radius)
+            radius = maxRadius
+          }
+          const side = i % 2 === 0 ? -1 : 1
+          const inner = clearance + radius
+          const outer = Math.min(halfWidth - radius - 0.035, inner + 0.14)
+          fragment.horizontalRange = side > 0
+            ? { min: inner, max: outer } : { min: -outer, max: -inner }
+          fragment.mesh.position.x = THREE.MathUtils.clamp(side * (inner + (Math.floor(i / 2) % 4) * 0.025), fragment.horizontalRange.min, fragment.horizontalRange.max)
+          fragment.mesh.position.z = 0.14 + Math.sin(a) * 0.22
+          fragment.velocity.x = side * 0.035
+          fragment.velocity.z *= 0.4
         })
       }
       this.floorRoot.position.copy(this.fragmentRoot.position)
@@ -285,6 +335,7 @@ export class EggFocus {
     if (this.shell) this.scene.remove(this.shell)
     this.shell = null
     this.egg = null
+    this.greetingAge = null
   }
 
   render(renderer: THREE.WebGLRenderer) {

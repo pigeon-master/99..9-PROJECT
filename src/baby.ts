@@ -5,7 +5,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Group[]) {
   const plastic = new THREE.MeshStandardMaterial({ color: '#86c9ec', roughness: 0.36 })
   const plasticEdge = new THREE.MeshStandardMaterial({ color: '#68a8c8', roughness: 0.42 })
-  const blue = new THREE.MeshStandardMaterial({ color: '#97c6df', roughness: 0.28 })
+  const whiteButton = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.28 })
   const cotton = new THREE.MeshStandardMaterial({ color: '#fffdf5', roughness: 0.98 })
   const mint = new THREE.MeshStandardMaterial({ color: '#b1dfd9', roughness: 0.93 })
   const seam = new THREE.MeshStandardMaterial({ color: '#e4e9df', roughness: 1 })
@@ -46,7 +46,7 @@ export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Gro
     depth: 0.027, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008,
     bevelSegments: 2, curveSegments: 12,
   }), [plastic, plasticEdge]).position.set(0, 1.68, 0.91)
-  oval(pacifier, blue, [0, 1.675, 0.975], [0.114, 0.112, 0.065])
+  oval(pacifier, whiteButton, [0, 1.675, 0.975], [0.114, 0.112, 0.065])
   const handle = mesh(pacifier, new THREE.TorusGeometry(0.153, 0.021, 8, 28), plastic)
   handle.position.set(0, 1.59, 1.045)
   handle.scale.y = 0.85

@@ -8,6 +8,7 @@ import { updateBabyWalker } from './walker'
 import { updateRoyalSwing } from './royal-motion'
 import { HoldEffects } from './hold-effects'
 import { EggFocus } from './egg-focus'
+import { RoyalReward, palmCursor } from './royal-reward'
 import { pickSceneTarget } from './picking'
 import { setupTutorial } from './tutorial'
 import { createTutorialPreviews } from './tutorial-previews'
@@ -70,6 +71,7 @@ scene.add(floor)
 const feeding = new Feeding(scene)
 const holdEffects = new HoldEffects(scene)
 const eggFocus = new EggFocus()
+const royalReward = new RoyalReward(eggFocus)
 
 let boundsX = 10
 let boundsZ = 6
@@ -80,7 +82,7 @@ const silhouettes = new WeakMap<Pigeon, { radius: number; height: number }>()
 const birds: Pigeon[] = []
 // New appearances occupy slots in this fixed population, never add extra birds.
 const population = 100
-const specialStyles: Array<Pigeon['style']> = ['walker', 'gyaru', 'royal']
+const specialStyles: Array<Pigeon['style']> = ['walker', 'magic', 'maid', 'royal']
 for (let i = 0; i < population; i++) {
   const style = specialStyles[i - (population - specialStyles.length)] ?? 'classic'
   const bird = createPigeon(i, style)
@@ -90,7 +92,7 @@ for (let i = 0; i < population; i++) {
   bird.root.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(bird.root)
   const radius = Math.hypot(Math.max(Math.abs(box.min.x), Math.abs(box.max.x)), Math.max(Math.abs(box.min.z), Math.abs(box.max.z)))
-  silhouettes.set(bird, { radius: radius + 0.12, height: box.max.y + 0.18 + (bird.style === 'royal' ? 0.336 : 0) })
+  silhouettes.set(bird, { radius: radius + 0.12, height: box.max.y + 0.18 + (bird.style === 'royal' || bird.style === 'magic' || bird.style === 'maid' ? 0.336 : 0) })
 }
 function containBird(bird: Pigeon) {
   const shape = silhouettes.get(bird)!
@@ -194,7 +196,9 @@ function updateHover() {
   holdEffects.eggs.forEach(egg => { egg.hovered = false })
   if (!pointerInside || held || scattering) return
   if (eggFocus.egg) {
-    renderer.domElement.style.cursor = !eggFocus.ready ? 'wait' : eggFocus.hit(pointer) ? 'pointer' : 'default'
+    renderer.domElement.style.cursor = eggFocus.awaitingJuniorClick
+      ? eggFocus.hitHatchling(pointer) ? palmCursor : 'default'
+      : !eggFocus.ready ? 'wait' : eggFocus.hit(pointer) ? 'pointer' : 'default'
     return
   }
   const target = pick()
@@ -202,11 +206,14 @@ function updateHover() {
   renderer.domElement.style.cursor = target?.kind === 'egg' ? 'pointer' : target?.kind === 'bird' ? 'grab' : 'default'
 }
 renderer.domElement.addEventListener('pointerdown', event => {
+  if (royalReward.active) return
   if (activePointer !== null || (event.button !== 0 && event.button !== 2)) return
   updatePointer(event)
   if (eggFocus.egg) {
     if (event.button === 0 && eggFocus.ready) {
-      if (eggFocus.hit(pointer)) eggFocus.crack(pointer)
+      if (eggFocus.awaitingJuniorClick) {
+        if (eggFocus.hitHatchling(pointer)) royalReward.start()
+      } else if (eggFocus.hit(pointer)) eggFocus.crack(pointer)
       else eggFocus.close()
     }
     return
@@ -272,8 +279,10 @@ renderer.domElement.addEventListener('pointerleave', () => {
   pointerInside = false
   holdEffects.eggs.forEach(egg => { egg.hovered = false })
 })
-window.addEventListener('keydown', event => { if (event.key === 'Escape') eggFocus.close() })
-setupTutorial(() => { release(); eggFocus.close() }, () => createTutorialPreviews(birds.find(b => b.style === 'classic')!))
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close()
+})
+setupTutorial(() => { release(); if (!eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close() }, () => createTutorialPreviews(birds.find(b => b.style === 'classic')!))
 
 let previous = performance.now()
 let elapsed = 0
@@ -289,7 +298,7 @@ function animate(now: number) {
   for (const bird of birds) {
     const pos = bird.root.position
     const lifting = held === bird
-    const upright = bird.style === 'royal'
+    const upright = bird.style === 'royal' || bird.style === 'magic' || bird.style === 'maid'
     if (lifting) {
       pos.x = THREE.MathUtils.damp(pos.x, bird.target.x, 13, dt)
       pos.z = THREE.MathUtils.damp(pos.z, bird.target.z, 13, dt)
@@ -348,12 +357,14 @@ function animate(now: number) {
         wing.scale.z = 1
       }
     })
-    if (upright) updateRoyalSwing(bird, walking && !meal && struggle < 0.01, dt)
+    if (bird.style === 'royal') updateRoyalSwing(bird, walking && !meal && struggle < 0.01, dt)
     containBird(bird)
     if (bird.walker) updateBabyWalker(bird.walker, bird.root, !lifting && pos.y === 0, dt)
   }
   holdEffects.update(held, realDt)
   eggFocus.update(realDt)
+  royalReward.update()
+  document.querySelector<HTMLButtonElement>('.help-indicator')!.disabled = eggFocus.awaitingJuniorClick || royalReward.active
   updateHover()
   eggFocus.background.render(renderer, scene, camera)
   eggFocus.render(renderer)

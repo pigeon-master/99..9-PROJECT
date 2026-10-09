@@ -36,7 +36,7 @@ export function updateFlexibleNeck(mesh: THREE.Mesh, head: THREE.Group) {
     curve.getTangent(t, tangent)
     normal.crossVectors(axis, tangent).normalize()
     binormal.crossVectors(tangent, normal).normalize()
-    const radius = THREE.MathUtils.lerp(0.245, 0.175, t)
+    const radius = THREE.MathUtils.lerp(0.245, 0.175, t) * (mesh.userData.radiusScale ?? 1)
     for (let side = 0; side <= sides; side++) {
       const angle = -side / sides * Math.PI * 2
       const a = Math.cos(angle) * radius, b = Math.sin(angle) * radius

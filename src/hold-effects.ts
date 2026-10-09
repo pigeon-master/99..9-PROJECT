@@ -71,7 +71,7 @@ export class HoldEffects {
 
   update(bird: EffectBird | null, dt: number) {
     if (!Number.isFinite(dt) || dt <= 0) return
-    const eligible = bird?.style === 'gyaru' || bird?.style === 'baby' || bird?.style === 'walker' || bird?.style === 'royal' ? bird : null
+    const eligible = bird?.style === 'gyaru' || bird?.style === 'magic' || bird?.style === 'maid' || bird?.style === 'baby' || bird?.style === 'walker' || bird?.style === 'royal' ? bird : null
     if (eligible !== this.held) {
       this.release()
       this.held = eligible

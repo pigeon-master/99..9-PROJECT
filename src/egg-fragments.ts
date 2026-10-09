@@ -3,6 +3,7 @@ import * as THREE from 'three'
 export interface ShellFragment {
   mesh: THREE.Mesh; origin: THREE.Vector3; velocity: THREE.Vector3; spin: THREE.Vector3
   restRotation: THREE.Quaternion; contactAge: number; settled: boolean; bounces: number
+  horizontalRange?: { min: number; max: number }
 }
 
 // Partition the real shell triangles into adjoining irregular patches.
@@ -98,6 +99,9 @@ export function updateFragmentFall(fragments: ShellFragment[], floor: number, dt
       const mesh = fragment.mesh
       fragment.velocity.y -= 1.8 * step
       mesh.position.addScaledVector(fragment.velocity, step)
+      if (fragment.horizontalRange) {
+        mesh.position.x = THREE.MathUtils.clamp(mesh.position.x, fragment.horizontalRange.min, fragment.horizontalRange.max)
+      }
       if (fragment.bounces === 0) {
         const speed = fragment.spin.length()
         if (speed > 0) mesh.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(fragment.spin.clone().normalize(), speed * step))

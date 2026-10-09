@@ -88,6 +88,20 @@ canvas { display: block; touch-action: none; }
 .tutorial p:lang(en) { letter-spacing: 0.05em; }
 .tutorial .tutorial-hint { margin-top: 32px; font-family: Gulim, '굴림', sans-serif; font-weight: 400; font-size: 13px; word-break: keep-all; line-height: 1.5; }
 .tutorial .tutorial-hint-en { margin-top: 0; font-size: 11px; line-height: 1.5; }
+.royal-reward { position: fixed; inset: 0; z-index: 10; color: #000; text-align: center; }
+.royal-reward[hidden] { display: none; }
+.royal-reward-white { position: absolute; inset: 0; background: #fff; opacity: 0; transition: opacity 350ms ease-out; }
+.royal-greeting { position: absolute; top: 70%; left: 50%; transform: translate(-50%, -50%); width: 90%; margin: 0; font-family: Gulim, '굴림', sans-serif; font-size: clamp(44px, 7vw, 96px); font-weight: 700; opacity: 0; transition: opacity 350ms ease-out; }
+.royal-reward.greeting .royal-greeting { opacity: 1; }
+.royal-reward.fading .royal-reward-white { opacity: 1; }
+.royal-reward.greeting.fading .royal-greeting { opacity: 0; }
+.royal-discount { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: calc(100% - 40px); opacity: 0; visibility: hidden; }
+.royal-reward.discount .royal-discount { opacity: 1; visibility: visible; }
+.royal-discount p { margin: 0; font-size: clamp(20px, 3vw, 32px); line-height: 1.15; }
+.royal-discount .royal-discount-code { margin-top: 0.08em; font-size: clamp(32px, 5vw, 56px); }
+.royal-return { display: grid; place-items: center; width: 26px; height: 26px; margin: 28px auto 0; padding: 0; background: transparent; border: 1px solid currentColor; outline: none; box-shadow: none; color: #000; font: inherit; font-size: 18px; cursor: pointer; }
+.royal-return svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1px; }
+.royal-return:focus-visible { color: #777; }
 @media (max-width: 600px) {
   .project-title, .help-indicator { top: max(24px, env(safe-area-inset-top)); }
   .project-title { left: max(16px, env(safe-area-inset-left)); }

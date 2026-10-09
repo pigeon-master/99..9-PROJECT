@@ -4,11 +4,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { dressGyaru } from './gyaru'
 import { dressBaby } from './baby'
 import { dressRoyal } from './royal'
+import { dressMagic } from './magic'
+import { dressMaid } from './maid'
 import { createBabyWalker, type BabyWalker } from './walker'
 
 export interface Pigeon {
   id: number
-  style: 'classic' | 'gyaru' | 'baby' | 'walker' | 'royal'
+  style: 'classic' | 'gyaru' | 'magic' | 'maid' | 'baby' | 'walker' | 'royal'
   walker: BabyWalker | null
   name: string
   root: THREE.Group
@@ -107,12 +109,14 @@ function rod(parent: THREE.Object3D, mat: THREE.Material, a: THREE.Vector3, b: T
 }
 export function createPigeon(id: number, style: Pigeon['style'] = 'classic'): Pigeon {
   const isBaby = style === 'baby' || style === 'walker'
+  const upright = style === 'royal' || style === 'magic' || style === 'maid'
   const palette = isBaby
     ? { body: '#81878e', wing: '#a5abb1', head: '#535962', bar: '#41464e', neck: '#42665c', name: '쪽쪽이 아기' }
-    : palettes[style === 'gyaru' || style === 'royal' ? 0 : id % palettes.length]
+    : style === 'magic' || style === 'maid' ? { body: '#81838a', wing: '#888b92', head: '#85858b', bar: '#535a62', neck: '#80948e', name: '드레스 비둘기' }
+    : palettes[style === 'gyaru' || upright ? 0 : id % palettes.length]
   const root = new THREE.Group()
   root.userData.bird = id
-  const size = style === 'royal' ? 0.98 : isBaby ? 0.73 : 0.73 + (id * 7 % 11) / 34
+  const size = style === 'royal' ? 0.98 : style === 'magic' || style === 'maid' ? 0.92 : isBaby ? 0.73 : 0.73 + (id * 7 % 11) / 34
   root.scale.setScalar(size * (isBaby ? 1.1 : 1))
   const body = new THREE.Group()
   root.add(body)
@@ -129,10 +133,11 @@ export function createPigeon(id: number, style: Pigeon['style'] = 'classic'): Pi
   const feetMat = material(id % 3 === 0 ? '#9c5559' : '#bd7376', 0.65)
   const clawMat = material('#514846')
   const iridescence = new THREE.MeshPhysicalMaterial({ color: palette.neck, roughness: 0.48, metalness: 0.2, iridescence: 0.85, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 430], bumpMap: bumpTexture, bumpScale: 0.025 })
-  ellipsoid(body, plumage, [0, 0.94, style === 'royal' ? 0.08 : -0.03], style === 'royal' ? [0.27, 0.43, 0.23] : [0.38, 0.46, 0.68], style === 'royal' ? 0 : -0.25)
-  ellipsoid(body, plumage, [0, 1.12, style === 'royal' ? 0.2 : 0.35], style === 'royal' ? [0.25, 0.30, 0.18] : [0.31, 0.40, 0.37], -0.18)
+  if (style === 'magic' || style === 'maid') iridescence.map = featherTexture
+  ellipsoid(body, plumage, [0, 0.94, upright ? 0.08 : -0.03], upright ? [0.27, 0.43, 0.23] : [0.38, 0.46, 0.68], upright ? 0 : -0.25)
+  ellipsoid(body, plumage, [0, 1.12, upright ? 0.2 : 0.35], upright ? [0.25, 0.30, 0.18] : [0.31, 0.40, 0.37], -0.18)
   for (let j = 0; j < 5; j++) {
-    const feather = style === 'royal'
+    const feather = upright
       ? ellipsoid(body, dark, [(j - 2) * 0.063, 0.51, -0.43], [0.054, 0.026, 0.29], -0.48)
       : ellipsoid(body, dark, [(j - 2) * 0.086, 0.69, -0.84], [0.071, 0.026, 0.43], -0.17)
     feather.rotation.y = (j - 2) * 0.06
@@ -199,10 +204,13 @@ export function createPigeon(id: number, style: Pigeon['style'] = 'classic'): Pi
   if (style === 'gyaru') dressGyaru(body, neck, legs.map(hip => hip.children[0] as THREE.Group))
   if (isBaby) dressBaby(body, neck, wings)
   if (style === 'royal') dressRoyal(body, neck, legs, wings)
+  if (style === 'magic') dressMagic(body, neck, legs, wings)
+  if (style === 'maid') dressMaid(body, neck, legs, wings)
   const walker = style === 'walker' ? createBabyWalker(root) : null
   batchDetails(root)
   const neckBridge = createFlexibleNeck(iridescence)
+  if (style === 'magic' || style === 'maid') neckBridge.userData.radiusScale = 0.85
   body.add(neckBridge)
   updateFlexibleNeck(neckBridge, neck)
-  return { id, style, walker, name: `${style === 'royal' ? '자르반' : style === 'walker' ? '보행기 아기' : style === 'gyaru' ? '핑크 갸루' : palette.name} ${String(id + 1).padStart(2, '0')}`, root, body, neck, neckBridge, legs, wings, heading, speed: 1.0 + Math.random() * 0.75, phase: Math.random() * Math.PI * 2, turnTimer: Math.random() * 3, target: new THREE.Vector3(), velocityY: 0 }
+  return { id, style, walker, name: `${style === 'royal' ? '자르반' : style === 'walker' ? '보행기 아기' : style === 'magic' ? '마법 비둘기' : style === 'maid' ? '메이드 비둘기' : style === 'gyaru' ? '핑크 갸루' : palette.name} ${String(id + 1).padStart(2, '0')}`, root, body, neck, neckBridge, legs, wings, heading, speed: 1.0 + Math.random() * 0.75, phase: Math.random() * Math.PI * 2, turnTimer: Math.random() * 3, target: new THREE.Vector3(), velocityY: 0 }
 }

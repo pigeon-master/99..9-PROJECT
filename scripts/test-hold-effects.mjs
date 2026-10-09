@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { Group, Scene, Vector3 } from 'three'
 import { HoldEffects } from '../src/hold-effects.ts'
 
-for (const style of ['gyaru', 'baby', 'walker', 'royal']) {
+for (const style of ['gyaru', 'magic', 'maid', 'baby', 'walker', 'royal']) {
 let seed = 8123
 Math.random = () => { seed = seed * 16807 % 2147483647; return seed / 2147483647 }
 const root = new Group()

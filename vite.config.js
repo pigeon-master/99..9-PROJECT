@@ -7,9 +7,14 @@ export default defineConfig(({ command }) => ({
   base: './',
   ...(command === 'serve' ? {
     server: {
-      host: '0.0.0.0',
+      host: true,
       port: 5173,
       strictPort: true,
+      // Browser test profiles contain files Chrome locks on Windows.
+      // They are verification artifacts, not application source files.
+      watch: {
+        ignored: ['**/.tools/**', '**/certs/**'],
+      },
       https: {
         cert: readFileSync(fileURLToPath(new URL('./certs/dev-cert.pem', import.meta.url))),
         key: readFileSync(fileURLToPath(new URL('./certs/dev-key.pem', import.meta.url))),
