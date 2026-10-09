@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 
+export const eggFlightDuration = 0.45
+
 export class FocusBackground {
   amount = 0
   private target: THREE.WebGLRenderTarget | null = null
@@ -32,7 +34,7 @@ export class FocusBackground {
   })
   constructor() { this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material)) }
   update(active: boolean, dt: number) {
-    this.amount = active ? Math.min(1, this.amount + dt / 0.9) : THREE.MathUtils.damp(this.amount, 0, 12, dt)
+    this.amount = active ? Math.min(1, this.amount + dt / eggFlightDuration) : THREE.MathUtils.damp(this.amount, 0, 12, dt)
   }
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
     if (this.amount < 0.001) { renderer.render(scene, camera); return }

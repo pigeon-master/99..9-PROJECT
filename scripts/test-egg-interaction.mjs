@@ -53,10 +53,11 @@ assert.equal(pickSceneTarget(ray, [], effects.eggs), null)
 const startSize = focus.shell.scale.x
 focus.crack()
 assert.equal(egg.cracked, false, 'Cannot crack before arrival')
-focus.update(0.45)
-assert.ok(Math.abs(focus.background.amount - 0.5) < 1e-6, 'Radial fade advances with the 0.9-second egg flight')
+focus.update(0.225)
+assert.ok(!focus.ready, 'Cannot interact halfway through the faster flight')
+assert.ok(Math.abs(focus.background.amount - 0.5) < 1e-6, 'Radial fade advances with the 0.45-second egg flight')
 const halfwaySize = focus.shell.scale.x
-focus.update(0.46)
+focus.update(0.226)
 assert.ok(focus.ready)
 assert.ok(new THREE.Box3().setFromObject(focus.shell, true).getCenter(new THREE.Vector3()).length() < 1e-6, 'Actual shell silhouette reaches exact screen center')
 assert.ok(focus.shell.scale.x - halfwaySize > (halfwaySize - startSize) * 3, 'Growth accelerates near the center')
@@ -126,8 +127,11 @@ assert.ok(remains && remains.children.filter(piece => piece.isMesh).length === p
 assert.equal(Boolean(remains.getObjectByName('royal-hatchling')), style === 'royal', 'Newborn stays among the ground shells after closing')
 assert.equal(remains.position.x, origin.x)
 assert.equal(remains.position.z, origin.z)
+const groundBounds = new THREE.Box3().setFromObject(remains, true).getSize(new THREE.Vector3())
+assert.ok(Math.max(groundBounds.x, groundBounds.z) > 0.7, 'Ground shells are wider than a full-sized puddle')
 for (const piece of remains.children.filter(piece => piece.isMesh)) {
   assert.ok(Math.abs(piece.position.y + fragmentBottom({ mesh: piece })) < 1e-5, 'World shell pieces rest on the ground')
+  assert.ok(piece.getObjectByName('ground-shell-rim'), 'Ground shells have subtle broken edge shading')
 }
 assert.equal(pickSceneTarget(ray, [], effects.eggs), null)
 focus.update(1)

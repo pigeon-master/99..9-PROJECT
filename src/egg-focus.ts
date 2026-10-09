@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { Egg } from './hold-effects'
 import { createEggFragments, beginFragmentFall, updateFragmentFall, type ShellFragment } from './egg-fragments.ts'
-import { FocusBackground } from './focus-background.ts'
+import { FocusBackground, eggFlightDuration } from './focus-background.ts'
 import { createRoyalHatchling } from './hatchling.ts'
 
 // Camera-space presentation keeps the egg centered on resize and prevents the
@@ -48,7 +48,7 @@ export class EggFocus {
     this.scene.add(fill)
   }
 
-  get ready() { return this.egg !== null && this.elapsed >= 0.9 }
+  get ready() { return this.egg !== null && this.elapsed >= eggFlightDuration }
 
   open(egg: Egg, worldCamera: THREE.OrthographicCamera) {
     if (this.egg || !egg.landed) return
@@ -105,7 +105,7 @@ export class EggFocus {
     this.background.update(this.egg !== null, dt)
     if (!this.shell) return
     this.elapsed += dt
-    const t = Math.min(1, this.elapsed / 0.9)
+    const t = Math.min(1, this.elapsed / eggFlightDuration)
     const travel = 1 - (1 - t) ** 3
     // Growth accelerates late in the flight, as the egg reaches the center.
     const growth = t ** 3
@@ -245,11 +245,20 @@ export class EggFocus {
         const remains = new THREE.Group()
         remains.name = 'ground-egg-fragments'
         remains.position.set(this.egg.mesh.position.x, 0.003, this.egg.mesh.position.z)
+        remains.scale.setScalar(1.6)
+        const shellMaterial = (this.egg.mesh.material as THREE.MeshStandardMaterial).clone()
+        shellMaterial.color.set('#f2e8d5')
+        shellMaterial.roughness = 0.85
+        const rimMaterial = new THREE.LineBasicMaterial({ color: '#ad9b80', transparent: true, opacity: 0.4 })
         this.fragments.forEach(fragment => {
           const piece = fragment.mesh.clone()
           piece.geometry = fragment.mesh.geometry.clone()
-          piece.material = this.egg!.mesh.material
+          piece.material = shellMaterial
           piece.position.y -= this.floorHeight
+          // Fine warm rims follow the broken edges without a heavy silhouette.
+          const rim = new THREE.LineSegments(new THREE.EdgesGeometry(piece.geometry, 55), rimMaterial)
+          rim.name = 'ground-shell-rim'
+          piece.add(rim)
           remains.add(piece)
         })
         if (this.hatchling) {
