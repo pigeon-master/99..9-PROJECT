@@ -112,11 +112,18 @@ function containBird(bird: Pigeon) {
 }
 let scattered = false
 let viewZoom = 1
+let pendingZoom: number | null = null
 let baseHalfWidth = 10, baseHalfHeight = 6
-function resize(zoomOnly = false) {
+function updateCameraView() {
+  viewZoom = THREE.MathUtils.clamp(viewZoom, 0.65, Math.min(2, baseHalfWidth / 3.4, baseHalfHeight / 3.4))
+  Object.assign(camera, { left: -baseHalfWidth / viewZoom, right: baseHalfWidth / viewZoom,
+    top: baseHalfHeight / viewZoom, bottom: -baseHalfHeight / viewZoom })
+  camera.updateProjectionMatrix()
+}
+function resize() {
   const width = container.clientWidth, height = container.clientHeight
   const layout = flockLayout(width, height, matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
-  if (!zoomOnly) {
+  {
     const nextBirds = [...allBirds.filter(b => b.style === 'classic').slice(0, layout.count - specialStyles.length), ...allBirds.filter(b => b.style !== 'classic')]
     if (nextBirds.length !== birds.length) { release(); scattered = false }
     for (const bird of allBirds) {
@@ -128,17 +135,17 @@ function resize(zoomOnly = false) {
     baseHalfWidth = layout.halfWidth; baseHalfHeight = layout.halfHeight
     if (!layout.compact) viewZoom = 1
   }
-  viewZoom = THREE.MathUtils.clamp(viewZoom, 0.65, Math.min(2, baseHalfWidth / 3.4, baseHalfHeight / 3.4))
-  const halfWidth = baseHalfWidth / viewZoom
-  const halfHeight = baseHalfHeight / viewZoom
+  pendingZoom = null
+  const halfWidth = baseHalfWidth
+  const halfHeight = baseHalfHeight
   viewportHalfHeight = halfHeight
   // Tall viewports need the orthographic camera farther back so even bottom-edge
   // pointer rays start above the floor and can intersect it in front of the camera.
-  const cameraDistance = Math.max(1, (halfHeight * Math.cos(Math.atan2(16, 22)) + 4) / 16)
+  const cameraDistance = Math.max(1, (halfHeight / 0.65 * viewCos + 4) / 16)
   camera.position.set(0, 16 * cameraDistance, 22 * cameraDistance)
   camera.lookAt(0, 0, 0)
-  Object.assign(camera, { left: -halfWidth, right: halfWidth, top: halfHeight, bottom: -halfHeight, near: 0.1, far: Math.max(100, camera.position.length() * 2 + halfHeight * 2) })
-  camera.updateProjectionMatrix()
+  Object.assign(camera, { near: 0.1, far: Math.max(100, camera.position.length() * 2 + halfHeight * 2 / 0.65) })
+  updateCameraView()
   renderer.setSize(width, height)
   eggFocus.resize(width, height)
   const oldX = boundsX, oldZ = boundsZ
@@ -160,10 +167,8 @@ function resize(zoomOnly = false) {
       minZ: (-viewportHalfHeight + shape.height * viewCos) / viewSin + shape.radius,
       maxZ: viewportHalfHeight / viewSin - shape.radius,
     })
-    if (!zoomOnly) {
-      bird.root.position.x = THREE.MathUtils.clamp(bird.root.position.x / oldX * boundsX, -boundsX, boundsX)
-      bird.root.position.z = THREE.MathUtils.clamp(bird.root.position.z / oldZ * boundsZ, -boundsZ, boundsZ)
-    }
+    bird.root.position.x = THREE.MathUtils.clamp(bird.root.position.x / oldX * boundsX, -boundsX, boundsX)
+    bird.root.position.z = THREE.MathUtils.clamp(bird.root.position.z / oldZ * boundsZ, -boundsZ, boundsZ)
     resetRoute(bird, boundsX, boundsZ, birds)
   }
   if (!scattered) { scatterFlock(birds, boundsX, boundsZ); scattered = true }
@@ -185,9 +190,10 @@ const foodPoint = new THREE.Vector3()
 const lastFoodPoint = new THREE.Vector3()
 function dropFood(start = false) {
   if (!raycaster.ray.intersectPlane(foodPlane, foodPoint)) return
-  const foodX = boundsX - 0.1, foodZ = boundsZ - 0.1
+  const foodX = Math.min(boundsX, camera.right) - 0.1
+  const foodZ = Math.min(boundsZ, camera.top / viewSin) - 0.1
   // The top edge also needs room for the highest point of the grain's arc.
-  const minFoodZ = (-viewportHalfHeight + 2.4 * viewCos) / viewSin + 0.1
+  const minFoodZ = (-Math.min(viewportHalfHeight, camera.top) + 2.4 * viewCos) / viewSin + 0.1
   foodPoint.x = THREE.MathUtils.clamp(foodPoint.x, -foodX, foodX)
   foodPoint.z = THREE.MathUtils.clamp(foodPoint.z, minFoodZ, foodZ)
   if (start) {
@@ -307,8 +313,8 @@ setupTutorial(() => { release(); if (!eggFocus.awaitingJuniorClick && !royalRewa
 setupTouchGestures(renderer.domElement, {
   blocked: () => !!eggFocus.egg || royalReward.active,
   release,
-  zoom: () => viewZoom,
-  setZoom: value => { viewZoom = value; resize(true) },
+  zoom: () => pendingZoom ?? viewZoom,
+  setZoom: value => { pendingZoom = value },
   feed: (x, y, start) => { updatePointer({ clientX: x, clientY: y }); dropFood(start) },
 })
 resize()
@@ -318,6 +324,12 @@ let elapsed = 0
 const struggleAmounts = new WeakMap<Pigeon, number>()
 const peckAmounts = new WeakMap<Pigeon, number>()
 function animate(now: number) {
+  // Coalesce pointer events into one cheap camera update per rendered frame.
+  // Zoom never rebuilds the canvas or changes flock routes, bounds or positions.
+  if (pendingZoom !== null) {
+    viewZoom = pendingZoom; pendingZoom = null
+    updateCameraView()
+  }
   const realDt = Math.max(0, (now - previous) / 1000)
   const dt = Math.min(realDt, 0.04)
   previous = now

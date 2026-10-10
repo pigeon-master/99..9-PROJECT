@@ -94,6 +94,7 @@ canvas { display: block; touch-action: none; }
 .royal-reward-white { position: absolute; inset: 0; background: #fff; opacity: 0; transition: opacity 350ms ease-out; }
 .royal-greeting { position: absolute; top: 70%; left: 50%; transform: translate(-50%, -50%); width: 90%; margin: 0; font-family: Gulim, '굴림', sans-serif; font-size: clamp(44px, 7vw, 96px); font-weight: 700; opacity: 0; transition: opacity 350ms ease-out; }
 .royal-reward.greeting .royal-greeting { opacity: 1; }
+.royal-greeting img { display: block; width: 4.3em; max-width: 100%; height: auto; margin: 0 auto; }
 .royal-reward.fading .royal-reward-white { opacity: 1; }
 .royal-reward.greeting.fading .royal-greeting { opacity: 0; }
 .royal-discount { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: calc(100% - 40px); opacity: 0; visibility: hidden; }

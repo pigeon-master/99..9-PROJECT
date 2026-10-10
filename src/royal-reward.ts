@@ -1,4 +1,5 @@
 import type { EggFocus } from './egg-focus'
+import greetingUrl from './royal-greeting.svg'
 
 export const shopUrl = 'https://www.crappyroom.shop'
 
@@ -22,7 +23,7 @@ export class RoyalReward {
     this.overlay.setAttribute('aria-label', '자르반84세 경로우대 할인 코드')
     this.overlay.innerHTML = `
       <div class="royal-reward-white" aria-hidden="true"></div>
-      <p class="royal-greeting" lang="ko">경로우대!</p>
+      <p class="royal-greeting" lang="ko"><img src="${greetingUrl}" alt="경로우대!"></p>
       <div class="royal-discount" aria-live="polite">
         <p>9% Discount Code :</p>
         <p class="royal-discount-code">sexypigeon</p>
