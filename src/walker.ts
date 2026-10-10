@@ -17,15 +17,16 @@ export function createBabyWalker(root: THREE.Group): BabyWalker {
   const frame = new THREE.Group()
   frame.name = 'baby-walker'
   root.add(frame)
-  const turquoise = new THREE.MeshStandardMaterial({ color: '#62cbd6', roughness: 0.28 })
-  const mint = new THREE.MeshStandardMaterial({ color: '#b2eddb', roughness: 0.31 })
+  const turquoise = new THREE.MeshStandardMaterial({ color: '#3cc6b6', roughness: 0.24 })
+  const skyBlue = new THREE.MeshStandardMaterial({ color: '#b5e9f7', roughness: 0.27 })
   const white = new THREE.MeshStandardMaterial({ color: '#fffdf4', roughness: 0.42 })
-  const lime = new THREE.MeshStandardMaterial({ color: '#c7df92', roughness: 0.5 })
-  const tire = new THREE.MeshStandardMaterial({ color: '#398a94', roughness: 0.65 })
+  const lime = new THREE.MeshStandardMaterial({ color: '#d1ecae', roughness: 0.5 })
+  const tire = new THREE.MeshStandardMaterial({ color: '#288f84', roughness: 0.65 })
   const yellow = new THREE.MeshStandardMaterial({ color: '#ffe17c', roughness: 0.4 })
   const pink = new THREE.MeshStandardMaterial({ color: '#eaa0d6', roughness: 0.4 })
   const red = new THREE.MeshStandardMaterial({ color: '#f2776d', roughness: 0.37 })
-  const gray = new THREE.MeshStandardMaterial({ color: '#889699', roughness: 0.43 })
+  const gray = new THREE.MeshStandardMaterial({ color: '#7e838b', roughness: 0.28 })
+  const beak = new THREE.MeshStandardMaterial({ color: '#606770', roughness: 0.37 })
   const orange = new THREE.MeshStandardMaterial({ color: '#df9155', roughness: 0.4 })
   const black = new THREE.MeshStandardMaterial({ color: '#293b3e', roughness: 0.4 })
   const mesh = (parent: THREE.Group, geometry: THREE.BufferGeometry, material: THREE.Material) => {
@@ -57,7 +58,8 @@ export function createBabyWalker(root: THREE.Group): BabyWalker {
   tray.holes.push(hole)
   const trayMesh = mesh(frame, new THREE.ExtrudeGeometry(tray, {
     depth: 0.085, bevelEnabled: true, bevelSize: 0.035, bevelThickness: 0.025, bevelSegments: 2, curveSegments: 20,
-  }), mint)
+  }), skyBlue)
+  trayMesh.name = 'walker-sky-blue-tray'
   trayMesh.rotation.x = -Math.PI / 2
   trayMesh.position.y = 0.88
   tube(ellipse(0.80, 0.92, 0.98), 0.026, turquoise, true)
@@ -71,10 +73,10 @@ export function createBabyWalker(root: THREE.Group): BabyWalker {
   const clothCanvas = document.createElement('canvas')
   clothCanvas.width = clothCanvas.height = 64
   const ctx = clothCanvas.getContext('2d')!
-  ctx.fillStyle = '#f5f8df'; ctx.fillRect(0, 0, 64, 64)
-  ctx.fillStyle = '#d9e9ac'
+  ctx.fillStyle = '#f3f9e5'; ctx.fillRect(0, 0, 64, 64)
+  ctx.fillStyle = '#deefc5'
   for (let i = 0; i < 8; i++) { ctx.fillRect(i * 8, 0, 4, 64); ctx.fillRect(0, i * 8, 64, 4) }
-  ctx.fillStyle = '#c3db8a'
+  ctx.fillStyle = '#cce7a9'
   for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) ctx.fillRect(x * 8, y * 8, 4, 4)
   const texture = new THREE.CanvasTexture(clothCanvas)
   texture.colorSpace = THREE.SRGBColorSpace
@@ -93,13 +95,13 @@ export function createBabyWalker(root: THREE.Group): BabyWalker {
   cushion.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   cushion.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
   cushion.setIndex(indices); cushion.computeVertexNormals()
-  mesh(frame, cushion, cloth)
+  mesh(frame, cushion, cloth).name = 'walker-apple-mint-seat'
   tube(topEdge, 0.035, lime)
 
   // Front play tray: colored bead posts, white handle, buttons and pigeon toy.
   oval(frame, turquoise, [0, 0.976, 0.76], [0.57, 0.055, 0.22])
   for (const side of [-1, 1]) {
-    for (let level = 0; level < 3; level++) oval(frame, [turquoise, yellow, pink][level],
+    for (let level = 0; level < 3; level++) oval(frame, [skyBlue, yellow, pink][level],
       [side * 0.58, 1.02 + level * 0.085, 0.58], [0.074, 0.05, 0.074])
     oval(frame, yellow, [side * 0.58, 1.29, 0.58], [0.05, 0.06, 0.05])
     oval(frame, red, [side * 0.38, 1.044, 0.81], [0.10, 0.035, 0.08])
@@ -108,12 +110,15 @@ export function createBabyWalker(root: THREE.Group): BabyWalker {
   tube([new THREE.Vector3(-0.58, 1.28, 0.58), new THREE.Vector3(-0.38, 1.27, 0.72),
     new THREE.Vector3(0, 1.18, 0.78), new THREE.Vector3(0.38, 1.27, 0.72), new THREE.Vector3(0.58, 1.28, 0.58)], 0.022, white)
   oval(frame, lime, [0, 1.04, 0.80], [0.15, 0.04, 0.115])
-  oval(frame, gray, [0, 1.19, 0.80], [0.115, 0.14, 0.12])
+  const toy = new THREE.Group(); toy.name = 'walker-pigeon-head-toy'; frame.add(toy)
+  oval(toy, gray, [0, 1.19, 0.80], [0.125, 0.14, 0.12])
   for (const side of [-1, 1]) {
-    oval(frame, orange, [side * 0.076, 1.22, 0.89], [0.025, 0.038, 0.015])
-    oval(frame, black, [side * 0.076, 1.22, 0.903], [0.011, 0.024, 0.007])
+    oval(toy, orange, [side * 0.076, 1.22, 0.89], [0.025, 0.038, 0.015])
+    oval(toy, black, [side * 0.076, 1.22, 0.903], [0.011, 0.024, 0.007])
   }
-  oval(frame, white, [0, 1.175, 0.92], [0.033, 0.021, 0.031])
+  oval(toy, white, [0, 1.175, 0.92], [0.033, 0.021, 0.031])
+  const toyBeak = mesh(toy, new THREE.ConeGeometry(0.026, 0.09, 8), beak)
+  toyBeak.position.set(0, 1.151, 0.959); toyBeak.rotation.x = Math.PI / 2
 
   const casters: Caster[] = []
   for (let i = 0; i < 6; i++) {

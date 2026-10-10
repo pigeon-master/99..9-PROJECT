@@ -9,7 +9,7 @@ export interface Egg { mesh: THREE.Mesh; velocity: THREE.Vector3; landed: boolea
 
 const burstStarts = [1, 2.15]
 const burstDuration = 0.45
-const eggTime = burstStarts[1] + burstDuration + 2
+const eggTime = burstStarts[1] + burstDuration + 1.5
 const gravity = 13
 const up = new THREE.Vector3(0, 1, 0)
 const rollRadius = 0.46 * 0.7

@@ -14,7 +14,7 @@ import { setupTutorial } from './tutorial'
 import { createTutorialPreviews } from './tutorial-previews'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <main aria-label="갸루와 쪽쪽이 비둘기를 포함한 비둘기 100마리가 걸어 다니는 3D 공간">
+  <main aria-label="보행기, 메이드, 자르반 비둘기를 포함한 비둘기 100마리가 걸어 다니는 3D 공간">
     <h1 class="project-title" aria-label="99..9Project">
       <svg viewBox="0 0 514 98" aria-hidden="true" focusable="false">
         <text x="12" y="74" font-size="66" letter-spacing="10" textLength="490" lengthAdjust="spacingAndGlyphs">99..9Project</text>
@@ -82,7 +82,7 @@ const silhouettes = new WeakMap<Pigeon, { radius: number; height: number }>()
 const birds: Pigeon[] = []
 // New appearances occupy slots in this fixed population, never add extra birds.
 const population = 100
-const specialStyles: Array<Pigeon['style']> = ['walker', 'magic', 'maid', 'royal']
+const specialStyles: Array<Pigeon['style']> = ['walker', 'maid', 'royal']
 for (let i = 0; i < population; i++) {
   const style = specialStyles[i - (population - specialStyles.length)] ?? 'classic'
   const bird = createPigeon(i, style)

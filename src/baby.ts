@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 
 // Accessories use existing body/head joints and are batched with their parent.
-export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Group[]) {
+export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Group[], includeDiaper = true) {
   const plastic = new THREE.MeshStandardMaterial({ color: '#86c9ec', roughness: 0.36 })
   const plasticEdge = new THREE.MeshStandardMaterial({ color: '#68a8c8', roughness: 0.42 })
   const whiteButton = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.28 })
@@ -53,6 +53,7 @@ export function dressBaby(body: THREE.Group, head: THREE.Group, wings: THREE.Gro
   handle.rotation.x = -0.13
   for (const side of [-1, 1]) oval(pacifier, plastic, [side * 0.14, 1.66, 1.013], [0.027, 0.039, 0.026])
 
+  if (!includeDiaper) return
   const diaper = new THREE.Group()
   diaper.name = 'baby-diaper'
   diaper.position.y = 0.16

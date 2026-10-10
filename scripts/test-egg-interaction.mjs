@@ -6,7 +6,7 @@ import { pickSceneTarget } from '../src/picking.ts'
 import { fragmentBottom } from '../src/egg-fragments.ts'
 
 function assertChickClearance(focus) {
-  const chick = focus.scene.getObjectByName('royal-hatchling')
+  const chick = focus.scene.getObjectByName('royal-hatchling') || focus.scene.getObjectByName('baby-hatchling') || focus.scene.getObjectByName('maid-hatchling')
   if (!chick) return
   focus.scene.updateMatrixWorld(true)
   const body = new THREE.Box3().setFromObject(chick, true)
@@ -104,6 +104,28 @@ assert.ok(focus.broken && focus.hitCount === 4)
 assertChickClearance(focus)
 assert.equal(egg.mesh.userData.parentStyle, style, 'Egg remembers which special bird laid it')
 assert.equal(Boolean(focus.scene.getObjectByName('royal-hatchling')), style === 'royal', 'Only the royal egg hatches this newborn')
+const babyJunior = style === 'baby' || style === 'walker'
+const maidJunior = style === 'maid'
+assert.equal(Boolean(focus.scene.getObjectByName('baby-hatchling')), babyJunior, 'Baby and walker eggs hatch the diapered newborn')
+assert.equal(Boolean(focus.scene.getObjectByName('maid-hatchling')), maidJunior)
+if (maidJunior) {
+  const chick = focus.scene.getObjectByName('maid-hatchling')
+  for (const name of ['maid-twintails', 'maid-lace-headband', 'maid-glasses']) assert.ok(chick.getObjectByName(name))
+  assert.equal(chick.getObjectByName('baby-diaper'), undefined)
+  assert.equal(chick.getObjectByName('royal-crown'), undefined)
+  assert.equal(chick.getObjectByName('maid-tea-service').visible, false, 'Tea props stay hidden until the newborn is clicked')
+  assert.equal(focus.awaitingJuniorClick, true)
+}
+if (babyJunior) {
+  const chick = focus.scene.getObjectByName('baby-hatchling')
+  assert.ok(chick.getObjectByName('baby-pacifier'))
+  assert.ok(chick.getObjectByName('baby-diaper'))
+  assert.ok(chick.getObjectByName('junior-diaper-leg-opening-0'))
+  assert.ok(chick.getObjectByName('junior-diaper-leg-opening-1'))
+  assert.equal(chick.getObjectByName('royal-crown'), undefined)
+  assert.equal(chick.getObjectByName('baby-walker'), undefined)
+  assert.equal(focus.awaitingJuniorClick, true)
+}
 if (style === 'royal') {
   const chick = focus.scene.getObjectByName('royal-hatchling')
   assert.ok(chick.getObjectByName('royal-crown'))
@@ -122,7 +144,7 @@ focus.floorMesh.getWorldPosition(stage)
 assert.ok(Math.abs(stage.y + 0.2) < 0.01, 'Transparent floor is just below screen center')
 const pieces = focus.scene.getObjectByName('egg-fragments').children
 assert.ok(pieces.length >= 5 && pieces.length <= 8, 'Fourth click splits the real shell into several pieces')
-if (style === 'royal') assert.equal(pieces.length, 8, 'Royal chick has two additional shell pieces')
+if (style === 'royal' || babyJunior || maidJunior) assert.equal(pieces.length, 8, 'Newborn has eight shell pieces')
 const before = pieces.map(piece => piece.position.clone())
 focus.update(0.4)
 assertChickClearance(focus)
@@ -156,11 +178,75 @@ if (style === 'royal') {
   assert.ok(chick.getObjectByName('hatchling-head').rotation.x < -0.8, 'Raised head counters the stooped torso to show the open beak')
   assertChickClearance(focus)
 }
+if (babyJunior) {
+  focus.greet()
+  const chick = focus.scene.getObjectByName('baby-hatchling')
+  for (let i = 0; i < 18; i++) focus.update(0.05)
+  assert.equal(focus.greetingReady, true)
+  assert.equal(chick.getObjectByName('hatchling-torso').position.y, 0.13, 'Crying chick remains seated')
+  assert.ok(chick.getObjectByName('hatchling-lower-beak').rotation.x > 0.7)
+  assert.ok(chick.getObjectsByProperty('name', 'hatchling-leg').every(leg => leg.scale.y === 1))
+  const tears = chick.getObjectByName('hatchling-tears')
+  assert.equal(tears.children.length, 24, 'Tears use a fixed small pool')
+  assert.ok(tears.children.filter(drop => drop.visible).length >= 12, 'Both eyes stream many tear drops')
+  assert.equal(tears.children[0].material.color.getHexString(), 'ffffff')
+  assert.ok(tears.children[0].material.opacity < 0.3, 'Colourless tears show the background through them')
+  const pacifier = chick.getObjectByName('hatchling-pacifier')
+  assert.equal(pacifier.parent, chick, 'Pacifier detaches from the beak')
+  assert.equal(pacifier.userData.settled, true, 'Pacifier settles on the floor')
+  const positions = tears.children.map(drop => drop.position.clone())
+  focus.update(0.05)
+  assert.ok(tears.children.some((drop, i) => drop.position.distanceTo(positions[i]) > 0.005), 'Tears arc and fall')
+}
+if (maidJunior) {
+  focus.greet()
+  const chick = focus.scene.getObjectByName('maid-hatchling')
+  for (let i = 0; i < 30; i++) focus.update(0.05)
+  assert.equal(focus.greetingReady, true)
+  assert.equal(chick.getObjectByName('maid-tea-service').visible, true)
+  assert.ok(chick.getObjectByName('maid-junior-teapot').rotation.z < -0.5, 'Teapot tips toward the cup')
+  assert.equal(chick.getObjectByName('maid-coffee-stream').visible, true)
+  assert.equal(chick.getObjectByName('maid-coffee-surface').visible, true)
+  assert.equal(chick.getObjectByName('maid-coffee-steam').visible, true)
+  assert.equal(chick.getObjectByName('hatchling-torso').position.y, 0.13, 'Maid stays low in a seated posture')
+  for (const [name, side, propName, handleX] of [
+    ['hatchling-left-wing', -1, 'maid-junior-teapot', -0.125],
+    ['hatchling-right-wing', 1, 'maid-junior-teacup', 0.071],
+  ]) {
+    const wing = chick.getObjectByName(name)
+    assert.deepEqual(wing.position.toArray(), [side * 0.09, 0.13, 0.025], 'Shoulder remains embedded in the torso during pouring')
+    const limb = wing.getObjectByName('maid-junior-wing-limb')
+    chick.updateWorldMatrix(true, true)
+    assert.equal(limb.geometry.type, 'SphereGeometry', 'Bare wing keeps its original flattened oval shape')
+    const tip = limb.localToWorld(new THREE.Vector3(0, 2, 0))
+    const grip = chick.getObjectByName(propName).localToWorld(new THREE.Vector3(handleX, 0.008, 0))
+    assert.ok(tip.distanceTo(grip) < 1e-5, 'Anchored wing reaches its prop handle without detaching')
+  }
+  for (const name of ['maid-junior-left-tail', 'maid-junior-right-tail']) {
+    const tail = chick.getObjectByName(name)
+    chick.updateWorldMatrix(true, true)
+    const points = tail.geometry.getAttribute('position')
+    let bottom = Infinity
+    for (let i = 0; i < points.count; i++) {
+      const point = chick.worldToLocal(tail.localToWorld(new THREE.Vector3().fromBufferAttribute(points, i)))
+      bottom = Math.min(bottom, point.y)
+    }
+    assert.ok(bottom >= 0 && bottom < 0.02, 'Long hair rests above the floor rather than clipping through it')
+  }
+  assertChickClearance(focus)
+}
 focus.close()
 assert.ok(!egg.mesh.visible && !egg.selected && !egg.mesh.parent, 'Closing a shattered egg does not restore an intact egg')
 const remains = scene.getObjectByName('ground-egg-fragments')
 assert.ok(remains && remains.children.filter(piece => piece.isMesh).length === pieces.length, 'Broken shell remains in the world')
 assert.equal(Boolean(remains.getObjectByName('royal-hatchling')), style === 'royal', 'Newborn stays among the ground shells after closing')
+assert.equal(Boolean(remains.getObjectByName('baby-hatchling')), babyJunior)
+assert.equal(Boolean(remains.getObjectByName('maid-hatchling')), maidJunior)
+if (maidJunior) {
+  assert.equal(remains.getObjectByName('maid-coffee-stream').visible, false)
+  assert.equal(remains.getObjectByName('maid-coffee-steam').visible, false)
+}
+assert.equal(remains.getObjectByName('hatchling-tears'), undefined, 'Transient tears are removed when returning to the flock')
 assert.equal(remains.position.x, origin.x)
 assert.equal(remains.position.z, origin.z)
 const groundBounds = new THREE.Box3().setFromObject(remains, true).getSize(new THREE.Vector3())

@@ -35,6 +35,10 @@ export class RoyalReward {
   start() {
     if (this.active || !this.focus.awaitingJuniorClick) return
     this.active = true
+    const royal = this.focus.egg?.mesh.userData.parentStyle === 'royal'
+    this.overlay.querySelector<HTMLElement>('.royal-greeting')!.hidden = !royal
+    this.overlay.setAttribute('aria-label', royal ? '자르반84세 경로우대 할인 코드'
+      : this.focus.egg?.mesh.userData.parentStyle === 'maid' ? '메이드 주니어 할인 코드' : '아기 비둘기 할인 코드')
     this.focus.greet()
     this.overlay.hidden = false
   }
@@ -44,15 +48,15 @@ export class RoyalReward {
     if (!this.active || this.announced || !this.focus.greetingReady) return
     this.announced = true
     this.overlay.classList.add('greeting')
-    this.timers.push(setTimeout(() => this.overlay.classList.add('fading'), 1950))
+    this.timers.push(setTimeout(() => this.overlay.classList.add('fading'), 1450))
     this.timers.push(setTimeout(() => {
       this.overlay.classList.add('discount')
       this.overlay.querySelector<HTMLButtonElement>('button')!.focus({ preventScroll: true })
-    }, 2300))
+    }, 1800))
     this.timers.push(setTimeout(() => {
       // Keep this shortly after the user's click, within transient activation.
       window.open(shopUrl, '_blank', 'noopener,noreferrer')
-    }, 3100))
+    }, 2600))
   }
 
   close() {

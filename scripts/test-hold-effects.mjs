@@ -44,8 +44,8 @@ advance(effects, gyaru, 0.6)
 assert.equal(volume(effects), 50, 'Exactly two bursts')
 assert.equal(effects.eggs.length, 0)
 assert.ok(effects.puddles.every(p => p.mesh.scale.x <= 0.301 && p.mesh.position.y === 0.014), 'Marks spread only over a small ground area')
-advance(effects, gyaru, 1.99) // hold = 4.59 seconds
-assert.equal(effects.eggs.length, 0, 'Wait 2 seconds after the second burst ends')
+advance(effects, gyaru, 1.49) // hold = 4.09 seconds
+assert.equal(effects.eggs.length, 0, 'Wait 1.5 seconds after the second burst ends')
 advance(effects, gyaru, 0.06)
 assert.equal(effects.eggs.length, 1)
 const egg = effects.eggs[0]

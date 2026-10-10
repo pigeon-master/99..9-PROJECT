@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import type { Egg } from './hold-effects'
 import { createEggFragments, beginFragmentFall, updateFragmentFall, type ShellFragment } from './egg-fragments.ts'
 import { FocusBackground, eggFlightDuration } from './focus-background.ts'
-import { createRoyalHatchling, updateRoyalHatchlingGreeting } from './hatchling.ts'
+import { createRoyalHatchling, updateRoyalHatchlingGreeting, createBabyHatchling, updateBabyHatchlingCry, stopBabyHatchlingCry } from './hatchling.ts'
+import { createMaidHatchling, updateMaidHatchlingTea, stopMaidHatchlingTea } from './maid-hatchling.ts'
 
 // Camera-space presentation keeps the egg centered on resize and prevents the
 // enlarged shell from intersecting the floor or the flock behind it.
@@ -50,6 +51,12 @@ export class EggFocus {
 
   greet() {
     if (this.awaitingJuniorClick) this.greetingAge = 0
+  }
+
+  private animateHatchling(age: number, emitTears = true) {
+    if (this.hatchling!.name === 'baby-hatchling') updateBabyHatchlingCry(this.hatchling!, age, emitTears)
+    else if (this.hatchling!.name === 'maid-hatchling') updateMaidHatchlingTea(this.hatchling!, age)
+    else updateRoyalHatchlingGreeting(this.hatchling!, age)
   }
 
   constructor() {
@@ -147,7 +154,7 @@ export class EggFocus {
         this.hatchling.rotation.z = Math.sin(this.hatchAge * 3) * 0.025
         if (this.greetingAge !== null) {
           this.greetingAge += Math.min(dt, 0.05)
-          updateRoyalHatchlingGreeting(this.hatchling, this.greetingAge)
+          this.animateHatchling(this.greetingAge)
         }
       }
       this.fragmentRoot.position.copy(this.shell.position)
@@ -207,7 +214,8 @@ export class EggFocus {
     this.growingCracks.push({ group: visibleCracks, age: 0 })
     if (this.hitCount === 4) {
       const patches = createEggFragments(this.shell.geometry, this.focusedMaterial!, impact)
-      const keptPieces = this.egg.mesh.userData.parentStyle === 'royal'
+      const hasJunior = ['royal', 'baby', 'walker', 'maid'].includes(this.egg.mesh.userData.parentStyle)
+      const keptPieces = hasJunior
         ? [0, 1, 2, 4, 6, 7, 9, 11] : [0, 2, 4, 7, 9, 11]
       this.fragments = patches.filter((fragment, index) => {
         if (keptPieces.includes(index)) return true
@@ -235,8 +243,9 @@ export class EggFocus {
       this.floorMesh.position.y = this.floorHeight - 0.001
       this.floorMesh.receiveShadow = true
       this.floorRoot.add(this.floorMesh)
-      if (this.egg.mesh.userData.parentStyle === 'royal') {
-        this.hatchling = createRoyalHatchling()
+      if (hasJunior) {
+        this.hatchling = this.egg.mesh.userData.parentStyle === 'royal' ? createRoyalHatchling()
+          : this.egg.mesh.userData.parentStyle === 'maid' ? createMaidHatchling() : createBabyHatchling()
         this.hatchAge = 0
         this.greetingAge = null
         this.hatchScale = Math.min(0.35, 0.95 / (1.2 * this.shell.scale.y))
@@ -246,12 +255,12 @@ export class EggFocus {
         // Reserve the chick's complete silhouette in both resting and greeting
         // poses. Shell pieces stay to either side, even while they tumble.
         const newbornBounds = new THREE.Box3()
-        for (const age of [0, 0.35, 0.55, 0.85]) {
-          updateRoyalHatchlingGreeting(this.hatchling, age)
+        for (const age of [0, 0.35, 0.55, 0.85, 1.2, 2.3]) {
+          this.animateHatchling(age, false)
           this.hatchling.updateWorldMatrix(true, true)
           newbornBounds.union(new THREE.Box3().setFromObject(this.hatchling, true))
         }
-        updateRoyalHatchlingGreeting(this.hatchling, 0)
+        this.animateHatchling(0, false)
         const clearance = Math.max(Math.abs(newbornBounds.min.x), Math.abs(newbornBounds.max.x)) + 0.025
         const halfWidth = this.aspect / this.shell.scale.x
         this.fragments.forEach((fragment, i) => {
@@ -312,6 +321,8 @@ export class EggFocus {
           remains.add(piece)
         })
         if (this.hatchling) {
+          stopBabyHatchlingCry(this.hatchling)
+          if (this.hatchling.name === 'maid-hatchling') stopMaidHatchlingTea(this.hatchling)
           this.hatchling.position.set(0, 0, 0.14)
           this.hatchling.scale.setScalar(this.hatchScale)
           remains.add(this.hatchling)
