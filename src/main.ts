@@ -12,6 +12,8 @@ import { RoyalReward, palmCursor } from './royal-reward'
 import { pickSceneTarget } from './picking'
 import { setupTutorial } from './tutorial'
 import { createTutorialPreviews } from './tutorial-previews'
+import { flockLayout } from './responsive'
+import { setupTouchGestures } from './touch-gestures'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main aria-label="보행기, 메이드, 자르반 비둘기를 포함한 비둘기 100마리가 걸어 다니는 3D 공간">
@@ -80,6 +82,7 @@ const viewSin = Math.sin(Math.atan2(16, 22))
 const viewCos = Math.cos(Math.atan2(16, 22))
 const silhouettes = new WeakMap<Pigeon, { radius: number; height: number }>()
 const birds: Pigeon[] = []
+const allBirds: Pigeon[] = []
 // New appearances occupy slots in this fixed population, never add extra birds.
 const population = 100
 const specialStyles: Array<Pigeon['style']> = ['walker', 'maid', 'royal']
@@ -87,7 +90,7 @@ for (let i = 0; i < population; i++) {
   const style = specialStyles[i - (population - specialStyles.length)] ?? 'classic'
   const bird = createPigeon(i, style)
   scene.add(bird.root)
-  birds.push(bird)
+  allBirds.push(bird)
   // Measure once, not once per frame; allow for animated heads and wings.
   bird.root.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(bird.root)
@@ -108,11 +111,26 @@ function containBird(bird: Pigeon) {
   return changed
 }
 let scattered = false
-function resize() {
+let viewZoom = 1
+let baseHalfWidth = 10, baseHalfHeight = 6
+function resize(zoomOnly = false) {
   const width = container.clientWidth, height = container.clientHeight
-  const aspect = width / height
-  const halfWidth = Math.max(10, 14 * aspect / 1.7)
-  const halfHeight = halfWidth / aspect
+  const layout = flockLayout(width, height, matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
+  if (!zoomOnly) {
+    const nextBirds = [...allBirds.filter(b => b.style === 'classic').slice(0, layout.count - specialStyles.length), ...allBirds.filter(b => b.style !== 'classic')]
+    if (nextBirds.length !== birds.length) { release(); scattered = false }
+    for (const bird of allBirds) {
+      bird.root.visible = nextBirds.includes(bird)
+      if (!bird.root.visible) feeding.cancel(bird)
+    }
+    birds.splice(0, birds.length, ...nextBirds)
+    document.querySelector('main')!.setAttribute('aria-label', `희귀 비둘기 3마리를 포함한 비둘기 ${birds.length}마리가 걸어 다니는 3D 공간`)
+    baseHalfWidth = layout.halfWidth; baseHalfHeight = layout.halfHeight
+    if (!layout.compact) viewZoom = 1
+  }
+  viewZoom = THREE.MathUtils.clamp(viewZoom, 0.65, Math.min(2, baseHalfWidth / 3.4, baseHalfHeight / 3.4))
+  const halfWidth = baseHalfWidth / viewZoom
+  const halfHeight = baseHalfHeight / viewZoom
   viewportHalfHeight = halfHeight
   // Tall viewports need the orthographic camera farther back so even bottom-edge
   // pointer rays start above the floor and can intersect it in front of the camera.
@@ -140,15 +158,16 @@ function resize() {
       minZ: (-viewportHalfHeight + shape.height * viewCos) / viewSin + shape.radius,
       maxZ: viewportHalfHeight / viewSin - shape.radius,
     })
-    bird.root.position.x = THREE.MathUtils.clamp(bird.root.position.x / oldX * boundsX, -boundsX, boundsX)
-    bird.root.position.z = THREE.MathUtils.clamp(bird.root.position.z / oldZ * boundsZ, -boundsZ, boundsZ)
+    if (!zoomOnly) {
+      bird.root.position.x = THREE.MathUtils.clamp(bird.root.position.x / oldX * boundsX, -boundsX, boundsX)
+      bird.root.position.z = THREE.MathUtils.clamp(bird.root.position.z / oldZ * boundsZ, -boundsZ, boundsZ)
+    }
     resetRoute(bird, boundsX, boundsZ, birds)
   }
   if (!scattered) { scatterFlock(birds, boundsX, boundsZ); scattered = true }
   birds.forEach(containBird)
 }
-window.addEventListener('resize', resize)
-resize()
+window.addEventListener('resize', () => resize())
 
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
@@ -181,7 +200,7 @@ function dropFood(start = false) {
     distance = lastFoodPoint.distanceTo(foodPoint)
   }
 }
-function updatePointer(event: PointerEvent) {
+function updatePointer(event: { clientX: number; clientY: number }) {
   pointerInside = true
   const rect = renderer.domElement.getBoundingClientRect()
   pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1)
@@ -273,7 +292,7 @@ function release() {
 renderer.domElement.addEventListener('pointerup', release)
 renderer.domElement.addEventListener('contextmenu', event => event.preventDefault())
 renderer.domElement.addEventListener('pointercancel', release)
-renderer.domElement.addEventListener('lostpointercapture', release)
+renderer.domElement.addEventListener('lostpointercapture', event => { if (event.pointerType !== 'touch') release() })
 window.addEventListener('blur', release)
 renderer.domElement.addEventListener('pointerleave', () => {
   pointerInside = false
@@ -283,6 +302,14 @@ window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close()
 })
 setupTutorial(() => { release(); if (!eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close() }, () => createTutorialPreviews(birds.find(b => b.style === 'classic')!))
+setupTouchGestures(renderer.domElement, {
+  blocked: () => !!eggFocus.egg || royalReward.active,
+  release,
+  zoom: () => viewZoom,
+  setZoom: value => { viewZoom = value; resize(true) },
+  feed: (x, y, start) => { updatePointer({ clientX: x, clientY: y }); dropFood(start) },
+})
+resize()
 
 let previous = performance.now()
 let elapsed = 0

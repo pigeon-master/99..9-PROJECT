@@ -23,6 +23,10 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
   const dialog = document.querySelector<HTMLDialogElement>('#tutorial')!
   const move = dialog.querySelector<HTMLElement>('[data-tutorial-move]')!
   const feed = dialog.querySelector<HTMLElement>('[data-tutorial-feed]')!
+  const zoom = document.createElement('p')
+  zoom.className = 'tutorial-zoom'; zoom.lang = 'en'; zoom.hidden = true
+  zoom.textContent = 'PINCH → ZOOM IN / OUT'
+  feed.closest('section')!.after(zoom)
   let previewsReady = false
   for (const side of ['left', 'right'] as const) dialog.querySelector<HTMLElement>(`[data-mouse="${side}"]`)!.innerHTML = mouseIllustration(side)
   button.addEventListener('click', event => {
@@ -31,6 +35,7 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     dialog.dataset.device = touch ? 'touch' : 'desktop'
+    zoom.hidden = !touch
     if (!touch && !previewsReady) {
       const previews = makePreviews()
       for (const key of ['pigeon', 'feed'] as const) dialog.querySelector<HTMLImageElement>(`[data-preview="${key}"]`)!.src = previews[key]
