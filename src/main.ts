@@ -145,7 +145,9 @@ function resize(zoomOnly = false) {
   // Use the floor projection of the full viewport, including the former footer.
   boundsX = halfWidth
   boundsZ = halfHeight / Math.sin(Math.atan2(16, 22))
-  feeding.containGrains(boundsX - 0.1, boundsZ - 0.1, (-halfHeight + 2.4 * viewCos) / viewSin + 0.1)
+  // Existing grain belongs to the floor, not the camera viewport. Keep its
+  // landing and launch coordinates intact when zooming or resizing; only newly
+  // scattered feed is constrained to the currently visible area in dropFood().
   sun.shadow.camera.left = -Math.max(boundsX, boundsZ) - 5
   sun.shadow.camera.right = Math.max(boundsX, boundsZ) + 5
   sun.shadow.camera.top = Math.max(boundsX, boundsZ) + 5

@@ -106,7 +106,7 @@ canvas { display: block; touch-action: none; }
 @media (max-width: 600px) {
   .project-title, .help-indicator { top: max(24px, env(safe-area-inset-top)); }
   .project-title { left: max(16px, env(safe-area-inset-left)); }
-  .help-indicator { right: max(16px, env(safe-area-inset-right)); }
+  .help-indicator { right: max(16px, env(safe-area-inset-right)); width: 36px; height: 36px; font-size: 24px; }
   .tutorial { top: calc(max(24px, env(safe-area-inset-top)) + 58px); right: max(16px, env(safe-area-inset-right)); padding: 24px; }
   .tutorial p { font-size: 13px; }
   .tutorial .tutorial-hint { font-size: 13px; }

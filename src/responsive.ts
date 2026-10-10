@@ -9,7 +9,7 @@ export function flockLayout(width: number, height: number, touch: boolean) {
   const halfHeight = Math.max(4.3, height / 76, 4.3 / aspect)
   return {
     compact,
-    count: Math.max(18, Math.min(70, Math.round(width * height / 15000))),
+    count: Math.min(100, 2 * Math.max(18, Math.min(70, Math.round(width * height / 15000)))),
     halfWidth: halfHeight * aspect,
     halfHeight,
   }

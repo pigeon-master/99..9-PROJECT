@@ -7,12 +7,12 @@ assert.equal(desktop.count, 100)
 assert.equal(desktop.halfWidth, 14 * 1.44 / 1.7)
 for (const [width, height] of [[390, 844], [844, 390], [768, 1024], [1024, 768]]) {
   const layout = flockLayout(width, height, true)
-  assert.ok(layout.count >= 18 && layout.count <= 70)
+  assert.ok(layout.count >= 36 && layout.count <= 100)
   assert.ok(layout.halfWidth >= 4.3 && layout.halfHeight >= 4.3)
   assert.ok(layout.count > 3, 'There is always room for all three special pigeons')
 }
-assert.equal(flockLayout(390, 844, true).count, 22)
-assert.equal(flockLayout(1024, 768, true).count, 52)
+assert.equal(flockLayout(390, 844, true).count, 44)
+assert.equal(flockLayout(1024, 768, true).count, 100)
 
 globalThis.window = new EventTarget()
 class Canvas extends EventTarget {
