@@ -1,13 +1,13 @@
 @font-face {
-  font-family: 'Ubuntu';
-  src: url('/fonts/Ubuntu-Light.ttf') format('truetype');
+  font-family: 'Space Mono';
+  src: url('/fonts/SpaceMono-Regular.ttf') format('truetype');
   font-style: normal;
-  font-weight: 300;
+  font-weight: 400;
   font-display: swap;
 }
 :root {
-  font-family: 'Ubuntu', sans-serif;
-  font-weight: 300;
+  font-family: 'Space Mono', monospace;
+  font-weight: 400;
   color: #000;
   background: #fff;
   font-synthesis: none;
@@ -18,19 +18,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 main { position: relative; width: 100%; height: 100svh; overflow: hidden; background: #fff; }
-.project-title {
-  position: absolute;
-  z-index: 2;
-  top: max(32px, env(safe-area-inset-top));
-  left: max(24px, env(safe-area-inset-left));
-  width: clamp(150px, 14.6vw, 219px);
-  margin: 0;
-  font-weight: 300;
-  line-height: 0;
-  pointer-events: none;
-  user-select: none;
-}
-.project-title svg { display: block; width: 100%; height: auto; fill: #000; transform: scaleX(1.1); transform-origin: left center; }
 #scene { position: absolute; inset: 0; }
 canvas { display: block; touch-action: none; }
 .help-indicator {
@@ -54,7 +41,7 @@ canvas { display: block; touch-action: none; }
   transition: background-color 150ms ease, color 150ms ease;
   user-select: none;
 }
-.help-indicator span { display: block; font-family: 'OCR B Std', 'ocr-b-std', monospace; font-weight: 400; transform: scaleX(1.1); }
+.help-indicator span { display: block; font-family: inherit; font-weight: 400; transform: scaleX(1.1); }
 .help-indicator:hover { background: #000; color: #fff; }
 .help-indicator:focus-visible { outline: 2px solid #888; outline-offset: 4px; }
 .tutorial {
@@ -105,8 +92,7 @@ canvas { display: block; touch-action: none; }
 .royal-return svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1px; }
 .royal-return:focus-visible { color: #777; }
 @media (max-width: 600px) {
-  .project-title, .help-indicator { top: max(24px, env(safe-area-inset-top)); }
-  .project-title { left: max(16px, env(safe-area-inset-left)); }
+  .help-indicator { top: max(24px, env(safe-area-inset-top)); }
   .help-indicator { right: max(16px, env(safe-area-inset-right)); width: 36px; height: 36px; font-size: 24px; }
   .tutorial { top: calc(max(24px, env(safe-area-inset-top)) + 58px); right: max(16px, env(safe-area-inset-right)); padding: 24px; }
   .tutorial p { font-size: 13px; }

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { Pigeon } from './pigeon'
-import { getMovementBounds } from './movement.ts'
+import { getMovementBounds, type MovementBounds } from './movement.ts'
 
 interface Grain {
   x: number; z: number; bites: number; size: number; angle: number; owner: number | null
@@ -26,6 +26,7 @@ export class Feeding {
   readonly controlled = new Set<Pigeon>()
   readonly mesh: THREE.InstancedMesh
   private searches = new WeakMap<Pigeon, number>()
+  private returning = new Set<Pigeon>()
   private dirty = true
   private dummy = new THREE.Object3D()
   private grainColor = new THREE.Color()
@@ -65,6 +66,7 @@ export class Feeding {
   cancel(bird: Pigeon) {
     const meal = this.meals.get(bird)
     if (meal) {
+      this.returning.add(bird)
       meal.grain.owner = null
       const area = this.areas.get(areaKey(meal.grain.x, meal.grain.z))
       if (area) area.reserved = Math.max(0, area.reserved - 1)
@@ -103,8 +105,26 @@ export class Feeding {
     }
   }
 
-  private findMeal(bird: Pigeon, boundsX: number, boundsZ: number) {
+  getBounds(bird: Pigeon, boundsX: number, boundsZ: number): MovementBounds {
     const limits = getMovementBounds(bird, boundsX, boundsZ)
+    const meal = this.meals.get(bird)
+    if (!meal && this.returning.has(bird)) {
+      const pos = bird.root.position
+      return {
+        minX: Math.min(limits.minX, pos.x), maxX: Math.max(limits.maxX, pos.x),
+        minZ: Math.min(limits.minZ, pos.z), maxZ: Math.max(limits.maxZ, pos.z),
+      }
+    }
+    if (!meal) return limits
+    // Feeding may cross the silhouette margin, only as far as its chosen
+    // standing position. Wandering still uses the original screen limits.
+    return {
+      minX: Math.min(limits.minX, meal.x - 0.15), maxX: Math.max(limits.maxX, meal.x + 0.15),
+      minZ: Math.min(limits.minZ, meal.z - 0.15), maxZ: Math.max(limits.maxZ, meal.z + 0.15),
+    }
+  }
+
+  private findMeal(bird: Pigeon) {
     const pos = bird.root.position
     // Assign under-served stretches first, including stretches across the screen.
     // Reservations count birds already approaching, not just birds eating there.
@@ -128,9 +148,10 @@ export class Feeding {
         // Several approach sides prevent a single crowded approach from making
         // the remaining grain seem unreachable, especially at screen edges.
         for (const offset of [0, -Math.PI / 3, Math.PI / 3, -2 * Math.PI / 3, 2 * Math.PI / 3, Math.PI]) {
+          // Approach at the ordinary pecking distance, even when part of the
+          // body crosses the screen edge; never stretch the neck to compensate.
           const x = grain.x + Math.sin(angle + offset) * reach
           const z = grain.z + Math.cos(angle + offset) * reach
-          if (x < limits.minX || x > limits.maxX || z < limits.minZ || z > limits.maxZ) continue
           let blocked = false
           for (const meal of this.meals.values()) {
             if ((meal.x - x) ** 2 + (meal.z - z) ** 2 < 0.85 ** 2) { blocked = true; break }
@@ -154,8 +175,26 @@ export class Feeding {
     this.refreshAreas(dt)
     this.controlled.clear()
     for (const bird of birds) {
-      const limits = getMovementBounds(bird, boundsX, boundsZ)
+      const limits = this.getBounds(bird, boundsX, boundsZ)
       if (bird === held || bird.root.position.y > 0) { this.cancel(bird); continue }
+      if (this.returning.has(bird)) {
+        const home = getMovementBounds(bird, boundsX, boundsZ), pos = bird.root.position
+        const dx = THREE.MathUtils.clamp(pos.x, home.minX, home.maxX) - pos.x
+        const dz = THREE.MathUtils.clamp(pos.z, home.minZ, home.maxZ) - pos.z
+        const distance = Math.hypot(dx, dz)
+        if (distance > 0.001) {
+          // Walk back in after eating rather than snapping to the screen margin.
+          const heading = Math.atan2(dx, dz)
+          const turn = Math.atan2(Math.sin(heading - bird.root.rotation.y), Math.cos(heading - bird.root.rotation.y))
+          bird.root.rotation.y += THREE.MathUtils.clamp(turn, -7 * dt, 7 * dt)
+          const step = Math.min(distance, bird.speed * dt)
+          pos.x += dx / distance * step; pos.z += dz / distance * step
+          bird.phase += step * 10
+          this.controlled.add(bird)
+          continue
+        }
+        this.returning.delete(bird)
+      }
       let meal = this.meals.get(bird)
       if (meal && (meal.grain.bites <= 0 || meal.age > 30 || meal.x < limits.minX || meal.x > limits.maxX || meal.z < limits.minZ || meal.z > limits.maxZ)) {
         this.cancel(bird); meal = undefined
@@ -163,7 +202,7 @@ export class Feeding {
       if (!meal) {
         const delay = (this.searches.get(bird) ?? 0) - dt
         this.searches.set(bird, delay)
-        if (delay <= 0) { this.findMeal(bird, boundsX, boundsZ); this.searches.set(bird, 0.2 + Math.random() * 0.2) }
+        if (delay <= 0) { this.findMeal(bird); this.searches.set(bird, 0.2 + Math.random() * 0.2) }
         meal = this.meals.get(bird)
       }
       if (!meal) continue
@@ -219,7 +258,7 @@ export class Feeding {
       if (d >= spacing) continue
       const nx = d > 0.001 ? dx / d : Math.sin(i * 2.4), nz = d > 0.001 ? dz / d : Math.cos(i * 2.4)
       const push = (spacing - d) * Math.min(0.5, dt * 10)
-      const aBounds = getMovementBounds(a, boundsX, boundsZ), bBounds = getMovementBounds(b, boundsX, boundsZ)
+      const aBounds = this.getBounds(a, boundsX, boundsZ), bBounds = this.getBounds(b, boundsX, boundsZ)
       a.root.position.x = THREE.MathUtils.clamp(a.root.position.x + nx * push, aBounds.minX, aBounds.maxX)
       a.root.position.z = THREE.MathUtils.clamp(a.root.position.z + nz * push, aBounds.minZ, aBounds.maxZ)
       b.root.position.x = THREE.MathUtils.clamp(b.root.position.x - nx * push, bBounds.minX, bBounds.maxX)

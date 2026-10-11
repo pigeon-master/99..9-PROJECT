@@ -42,7 +42,8 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
       previewsReady = true
     }
     move.textContent = touch ? 'TAP + HOLD → MOVE A PIGEON' : 'LEFT CLICK + DRAG → MOVE A PIGEON'
-    feed.textContent = touch ? 'TWO-FINGER DRAG → FEED THE PIGEONS' : 'RIGHT CLICK + DRAG → FEED THE PIGEONS'
+    feed.replaceChildren(document.createTextNode(touch ? 'TWO-FINGER DRAG → FEED THE PIGEONS' : 'RIGHT CLICK + DRAG →'))
+    if (!touch) feed.append(document.createElement('br'), document.createTextNode('FEED THE PIGEONS'))
     beforeOpen()
     dialog.showModal()
     button.setAttribute('aria-expanded', 'true')

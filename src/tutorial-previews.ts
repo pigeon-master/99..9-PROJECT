@@ -43,17 +43,33 @@ export function createTutorialPreviews(bird: Pigeon) {
   scene.add(model)
   renderer.render(scene, camera)
   const pigeon = renderer.domElement.toDataURL('image/png')
-  neck.geometry.dispose()
-  scene.remove(model)
+  // Reuse the same pigeon in its ground-level pecking pose beside the feed.
+  model.position.set(0.45, 0, 0.05)
+  model.rotation.set(0, -1.4, 0)
+  body.rotation.set(0, 0, 0)
+  head.position.set(0, -0.84, -0.8)
+  head.rotation.set(0.64, 0, 0)
+  updateFlexibleNeck(neck, head as THREE.Group)
+  bird.wings.forEach(wing => {
+    const copy = joint(wing)
+    copy.rotation.set(0, 0, 0)
+    copy.scale.z = 1
+  })
+  bird.legs.forEach(leg => {
+    joint(leg).rotation.set(0, 0, 0)
+    joint(leg).position.y = 0.48
+  })
   // Use the actual scattering/rendering code, including grain proportions,
   // colors, size variation and landing angles, rather than an approximation.
   const feeding = new Feeding(scene)
-  feeding.scatter(0, 0, 10, 10)
+  feeding.scatter(-0.65, 0.15, 10, 10)
+  feeding.scatter(-0.3, 0.4, 10, 10)
   feeding.update([], null, 10, 10, 1)
-  camera.position.set(0, 4, 5); camera.lookAt(0, 0, 0)
-  camera.zoom = 1.4; camera.updateProjectionMatrix()
+  camera.position.set(-3, 3, 6); camera.lookAt(0.05, 0.55, 0.05)
+  camera.zoom = 1; camera.updateProjectionMatrix()
   renderer.render(scene, camera)
   const feed = renderer.domElement.toDataURL('image/png')
+  neck.geometry.dispose()
   feeding.mesh.dispose()
   feeding.mesh.geometry.dispose()
   const materials = Array.isArray(feeding.mesh.material) ? feeding.mesh.material : [feeding.mesh.material]

@@ -13,7 +13,8 @@ export default defineConfig(({ command }) => ({
       // Browser test profiles contain files Chrome locks on Windows.
       // They are verification artifacts, not application source files.
       watch: {
-        ignored: ['**/.tools/**', '**/certs/**'],
+        // Windows can temporarily lock font binaries during download or scanning.
+        ignored: ['**/.tools/**', '**/certs/**', '**/public/fonts/**'],
       },
       https: {
         cert: readFileSync(fileURLToPath(new URL('./certs/dev-cert.pem', import.meta.url))),

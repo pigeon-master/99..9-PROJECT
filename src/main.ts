@@ -17,11 +17,6 @@ import { setupTouchGestures } from './touch-gestures'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main aria-label="보행기, 메이드, 자르반 비둘기를 포함한 비둘기 100마리가 걸어 다니는 3D 공간">
-    <h1 class="project-title" aria-label="99..9Project">
-      <svg viewBox="0 0 514 98" aria-hidden="true" focusable="false">
-        <text x="12" y="74" font-size="66" letter-spacing="10" textLength="490" lengthAdjust="spacingAndGlyphs">99..9Project</text>
-      </svg>
-    </h1>
     <div id="scene"></div>
     <button class="help-indicator" type="button" aria-label="조작 안내 열기" aria-haspopup="dialog" aria-controls="tutorial" aria-expanded="false"><span>?</span></button>
     <dialog id="tutorial" class="tutorial" aria-label="비둘기 조작 안내" tabindex="-1">
@@ -31,7 +26,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <p data-tutorial-move lang="en"></p>
         </section>
         <section class="tutorial-action">
-          <div class="tutorial-pictures"><div class="tutorial-mouse" data-mouse="right" aria-hidden="true"></div><img data-preview="feed" alt="흩뿌려진 모이"></div>
+          <div class="tutorial-pictures"><div class="tutorial-mouse" data-mouse="right" aria-hidden="true"></div><img data-preview="feed" alt="모이를 쪼아먹는 비둘기와 흩뿌려진 모이"></div>
           <p data-tutorial-feed lang="en"></p>
         </section>
         <p class="tutorial-hint" lang="ko">뭔가 이상한 비둘기는 인내심을 갖고 붙잡고 있으면<br>좋은 일이 생길지도...</p>
@@ -196,10 +191,11 @@ const foodPoint = new THREE.Vector3()
 const lastFoodPoint = new THREE.Vector3()
 function dropFood(start = false) {
   if (!raycaster.ray.intersectPlane(foodPlane, foodPoint)) return
-  const foodX = Math.min(boundsX, camera.right) - 0.1
-  const foodZ = Math.min(boundsZ, camera.top / viewSin) - 0.1
-  // The top edge also needs room for the highest point of the grain's arc.
-  const minFoodZ = (-Math.min(viewportHalfHeight, camera.top) + 2.4 * viewCos) / viewSin + 0.1
+  const foodX = camera.right - 0.1
+  const foodZ = camera.top / viewSin - 0.1
+  // Bound the landing point, rather than reserving a large empty strip for
+  // the airborne arc. Use the whole current view at every zoom level.
+  const minFoodZ = -camera.top / viewSin + 0.1
   foodPoint.x = THREE.MathUtils.clamp(foodPoint.x, -foodX, foodX)
   foodPoint.z = THREE.MathUtils.clamp(foodPoint.z, minFoodZ, foodZ)
   if (start) {
@@ -356,7 +352,7 @@ function animate(now: number) {
       pos.y = Math.max(0, pos.y + bird.velocityY * dt)
     }
     const meal = feeding.meals.get(bird)
-    const walking = !lifting && pos.y === 0 && (!feeding.controlled.has(bird) || meal?.mode === 'run')
+    const walking = !lifting && pos.y === 0 && (!meal || !feeding.controlled.has(bird) || meal.mode === 'run')
     const peck = THREE.MathUtils.damp(peckAmounts.get(bird) ?? 0, meal?.mode === 'eat' ? 1 : 0, 16, dt)
     peckAmounts.set(bird, peck)
     const phase = bird.phase
@@ -405,7 +401,7 @@ function animate(now: number) {
       }
     })
     if (bird.style === 'royal') updateRoyalSwing(bird, walking && !meal && struggle < 0.01, dt)
-    containBird(bird)
+    if (!feeding.controlled.has(bird) || lifting || pos.y > 0) containBird(bird)
     if (bird.walker) updateBabyWalker(bird.walker, bird.root, !lifting && pos.y === 0, dt)
   }
   holdEffects.update(held, realDt)
