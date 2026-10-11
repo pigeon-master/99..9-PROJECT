@@ -3,9 +3,9 @@ import greetingUrl from './royal-greeting.svg'
 
 export const shopUrl = 'https://www.crappyroom.shop'
 
-// Pixel-edged open palm, with the fingertip as the cursor's hot spot.
-const palm = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="32" viewBox="0 0 32 40"><path fill="white" stroke="black" stroke-width="1.8" stroke-linejoin="miter" d="M12 18V5h3V2h4v3h4v3h4v4h3v19h-3v5h-3v3H12v-3H9v-5H6v-5H3v-6h4v3h3v-5z"/><path fill="none" stroke="black" stroke-width="1.5" d="M15 5v15M19 5v15M23 8v13M27 12v12"/></svg>`
-export const palmCursor = `url("data:image/svg+xml,${encodeURIComponent(palm)}") 13 2, pointer`
+// Compact open palm matching the reference, with a transparent background.
+const palm = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="28" viewBox="0 0 32 34"><path fill="white" stroke="black" stroke-width="1.8" stroke-linejoin="miter" d="M10 15V6H14V3H18V4H22V5H26V8H29V23H27V26H24V29H12V27H9V24H7V20H5V14H8V17H10Z"/><path fill="none" stroke="black" stroke-width="1.5" d="M14 6V18M18 4V18M22 5V18M26 8V19"/></svg>`
+export const palmCursor = `url("data:image/svg+xml,${encodeURIComponent(palm)}") 13 3, pointer`
 
 export class RoyalReward {
   private readonly overlay = document.createElement('section')

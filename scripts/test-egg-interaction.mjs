@@ -108,6 +108,13 @@ const babyJunior = style === 'baby' || style === 'walker'
 const maidJunior = style === 'maid'
 assert.equal(Boolean(focus.scene.getObjectByName('baby-hatchling')), babyJunior, 'Baby and walker eggs hatch the diapered newborn')
 assert.equal(Boolean(focus.scene.getObjectByName('maid-hatchling')), maidJunior)
+const idleChick = focus.scene.getObjectByName('royal-hatchling') || focus.scene.getObjectByName('baby-hatchling') || focus.scene.getObjectByName('maid-hatchling')
+const snapshotPose = chick => {
+  const pose = []
+  chick.traverse(object => pose.push([object.name, object.position.toArray(), object.quaternion.toArray(), object.scale.toArray(), object.visible]))
+  return pose
+}
+const idlePose = idleChick ? snapshotPose(idleChick) : null
 if (maidJunior) {
   const chick = focus.scene.getObjectByName('maid-hatchling')
   for (const name of ['maid-twintails', 'maid-lace-headband', 'maid-glasses']) assert.ok(chick.getObjectByName(name))
@@ -160,6 +167,16 @@ const resting = pieces.map(piece => ({ p: piece.position.clone(), q: piece.quate
 focus.update(0.5)
 pieces.forEach((piece, i) => { assert.deepEqual(piece.position, resting[i].p); assert.deepEqual(piece.quaternion.toArray(), resting[i].q.toArray()) })
 const thirdCount = focus.hitCount
+if (idleChick) {
+  for (let i = 0; i < 25; i++) focus.hitHatchling(new THREE.Vector2(0, 0))
+  focus.update(2)
+  assert.deepEqual(snapshotPose(idleChick), idlePose, 'Hatching, waiting and hover detection never start a newborn action')
+  assert.equal(focus.awaitingJuniorClick, true)
+  assert.equal(focus.greetingReady, false)
+  assert.equal(Math.abs(idleChick.getObjectByName('hatchling-lower-beak').rotation.x), 0, 'Beak stays closed before clicking the newborn')
+  assert.equal(idleChick.getObjectByName('hatchling-tears'), undefined)
+  assert.ok(!idleChick.getObjectByName('hatchling-pacifier')?.userData.dropped)
+}
 focus.crack()
 assert.equal(focus.hitCount, thirdCount, 'Broken egg cannot spawn repeated fragments')
 if (style === 'royal') {

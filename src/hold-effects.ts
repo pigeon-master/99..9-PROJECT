@@ -5,7 +5,8 @@ type EffectBird = Pick<Pigeon, 'style' | 'body'>
 interface Drop { mesh: THREE.Mesh; velocity: THREE.Vector3; radius: number; jet: Jet }
 interface Jet { mesh: THREE.Mesh; emitting: boolean; landed: THREE.Vector3 | null }
 interface Puddle { mesh: THREE.Mesh; age: number; volume: number }
-export interface Egg { mesh: THREE.Mesh; velocity: THREE.Vector3; landed: boolean; rollAge: number; rollSpeed: number; direction: THREE.Vector3; axis: THREE.Vector3; rollAngle: number; targetAngle: number; heading: number; curve: number; phase: number; deceleration: number; restRotation: THREE.Quaternion | null; settleAge: number; hovered: boolean; selected: boolean; cracked: boolean }
+export interface EggBounds { minX: number; maxX: number; minZ: number; maxZ: number }
+export interface Egg { mesh: THREE.Mesh; velocity: THREE.Vector3; landed: boolean; rollAge: number; rollSpeed: number; direction: THREE.Vector3; axis: THREE.Vector3; rollAngle: number; targetAngle: number; heading: number; curve: number; phase: number; deceleration: number; restRotation: THREE.Quaternion | null; settleAge: number; hovered: boolean; selected: boolean; cracked: boolean; rollBounds?: EggBounds }
 
 const burstStarts = [1, 2.15]
 const burstDuration = 0.45
@@ -37,6 +38,13 @@ export class HoldEffects {
   private puddleGeometry: THREE.BufferGeometry
   private eggGeometry: THREE.BufferGeometry
   private scene: THREE.Scene
+  private eggBounds: EggBounds | undefined
+
+  setEggBounds(bounds: EggBounds) {
+    this.eggBounds = { ...bounds }
+    // Only moving eggs follow a changed view. Settled eggs retain their location.
+    for (const egg of this.eggs) if (!egg.selected && (!egg.landed || egg.rollSpeed > 0)) egg.rollBounds = { ...bounds }
+  }
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -235,6 +243,7 @@ export class HoldEffects {
       rollSpeed: initialSpeed, deceleration, rollAngle: 0, targetAngle, restRotation: null, settleAge: 0, hovered: false, selected: false, cracked: false,
       heading: angle, curve: (Math.random() < 0.5 ? -1 : 1) * (0.18 + Math.random() * 0.15), phase: Math.random() * Math.PI * 2,
       direction, axis: new THREE.Vector3().crossVectors(up, direction).normalize() })
+    if (this.eggBounds) this.eggs[this.eggs.length - 1].rollBounds = { ...this.eggBounds }
   }
 
   private stepPhysics(dt: number) {
@@ -261,7 +270,7 @@ export class HoldEffects {
     for (const egg of this.eggs) {
       if (egg.selected) continue
       egg.mesh.scale.setScalar(THREE.MathUtils.damp(egg.mesh.scale.x, egg.hovered ? 1.5 : 1, 15, dt))
-      if (egg.landed && egg.hovered) { egg.mesh.position.y = this.eggSupport(egg.mesh); continue }
+      if (egg.landed && egg.hovered) { this.containEgg(egg); egg.mesh.position.y = this.eggSupport(egg.mesh); continue }
       if (!egg.landed) {
         egg.velocity.y -= gravity * dt
         egg.mesh.position.addScaledVector(egg.velocity, dt)
@@ -280,6 +289,7 @@ export class HoldEffects {
         egg.direction.set(Math.cos(egg.heading), 0, Math.sin(egg.heading))
         egg.axis.crossVectors(up, egg.direction).normalize()
         egg.mesh.position.addScaledVector(egg.direction, distance)
+        this.containEgg(egg)
         egg.mesh.rotateOnWorldAxis(egg.axis, distance / rollRadius)
         egg.rollAngle += distance / rollRadius
         egg.mesh.position.y = this.eggSupport(egg.mesh)
@@ -297,8 +307,25 @@ export class HoldEffects {
         if (egg.settleAge >= 1) egg.mesh.quaternion.copy(egg.restRotation)
         egg.mesh.position.y = this.eggSupport(egg.mesh)
       }
-      if (egg.landed) egg.mesh.position.y = this.eggSupport(egg.mesh)
+      if (egg.landed) { this.containEgg(egg); egg.mesh.position.y = this.eggSupport(egg.mesh) }
     }
+  }
+
+  private containEgg(egg: Egg) {
+    const bounds = egg.rollBounds
+    if (!bounds) return
+    const pos = egg.mesh.position
+    const x = THREE.MathUtils.clamp(pos.x, bounds.minX, bounds.maxX)
+    const z = THREE.MathUtils.clamp(pos.z, bounds.minZ, bounds.maxZ)
+    const hitX = x !== pos.x, hitZ = z !== pos.z
+    if (!hitX && !hitZ) return
+    pos.x = x; pos.z = z
+    // A gentle inward rebound keeps the roll continuous instead of disappearing.
+    if (hitX) egg.direction.x = pos.x === bounds.minX ? Math.abs(egg.direction.x) : -Math.abs(egg.direction.x)
+    if (hitZ) egg.direction.z = pos.z === bounds.minZ ? Math.abs(egg.direction.z) : -Math.abs(egg.direction.z)
+    egg.heading = Math.atan2(egg.direction.z, egg.direction.x)
+    egg.axis.crossVectors(up, egg.direction).normalize()
+    egg.rollSpeed *= 0.65
   }
 
   private eggSupport(mesh: THREE.Mesh) {

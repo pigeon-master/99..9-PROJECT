@@ -119,6 +119,12 @@ function updateCameraView() {
   Object.assign(camera, { left: -baseHalfWidth / viewZoom, right: baseHalfWidth / viewZoom,
     top: baseHalfHeight / viewZoom, bottom: -baseHalfHeight / viewZoom })
   camera.updateProjectionMatrix()
+  // Leave room for the full shell, including its 1.5x hover enlargement.
+  holdEffects.setEggBounds({
+    minX: camera.left + 0.66, maxX: camera.right - 0.66,
+    minZ: (-camera.top + 1.3 * viewCos) / viewSin + 0.66,
+    maxZ: camera.top / viewSin - 0.66,
+  })
 }
 function resize() {
   const width = container.clientWidth, height = container.clientHeight

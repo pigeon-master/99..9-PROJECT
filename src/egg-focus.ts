@@ -25,7 +25,6 @@ export class EggFocus {
   private fragmentRoot: THREE.Group | null = null
   private floorHeight = 0
   private hatchling: THREE.Group | null = null
-  private hatchAge = 0
   private greetingAge: number | null = null
   private hatchScale = 0.35
   private floorRoot: THREE.Group | null = null
@@ -148,10 +147,7 @@ export class EggFocus {
     }
     if (this.fragmentRoot) {
       if (this.hatchling) {
-        this.hatchAge += dt
-        // The chick is already full-sized inside the egg; only the shell moves
-        // away to reveal it. Keep a small idle sway without changing its size.
-        this.hatchling.rotation.z = Math.sin(this.hatchAge * 3) * 0.025
+        // Stay in the exact newborn pose until a separate click calls greet().
         if (this.greetingAge !== null) {
           this.greetingAge += Math.min(dt, 0.05)
           this.animateHatchling(this.greetingAge)
@@ -246,7 +242,6 @@ export class EggFocus {
       if (hasJunior) {
         this.hatchling = this.egg.mesh.userData.parentStyle === 'royal' ? createRoyalHatchling()
           : this.egg.mesh.userData.parentStyle === 'maid' ? createMaidHatchling() : createBabyHatchling()
-        this.hatchAge = 0
         this.greetingAge = null
         this.hatchScale = Math.min(0.35, 0.95 / (1.2 * this.shell.scale.y))
         this.hatchling.position.set(0, this.floorHeight, 0.14)
@@ -255,12 +250,22 @@ export class EggFocus {
         // Reserve the chick's complete silhouette in both resting and greeting
         // poses. Shell pieces stay to either side, even while they tumble.
         const newbornBounds = new THREE.Box3()
+        const restingPose: Array<{ object: THREE.Object3D; position: THREE.Vector3; rotation: THREE.Quaternion; scale: THREE.Vector3; visible: boolean }> = []
+        this.hatchling.traverse(object => restingPose.push({ object, position: object.position.clone(),
+          rotation: object.quaternion.clone(), scale: object.scale.clone(), visible: object.visible }))
+        this.hatchling.updateWorldMatrix(true, true)
+        newbornBounds.setFromObject(this.hatchling, true)
         for (const age of [0, 0.35, 0.55, 0.85, 1.2, 2.3]) {
           this.animateHatchling(age, false)
           this.hatchling.updateWorldMatrix(true, true)
           newbornBounds.union(new THREE.Box3().setFromObject(this.hatchling, true))
         }
-        this.animateHatchling(0, false)
+        // Measuring future poses must not leave raised limbs, open beaks or
+        // visible props on the live chick before the user clicks it.
+        restingPose.forEach(({ object, position, rotation, scale, visible }) => {
+          object.position.copy(position); object.quaternion.copy(rotation)
+          object.scale.copy(scale); object.visible = visible
+        })
         const clearance = Math.max(Math.abs(newbornBounds.min.x), Math.abs(newbornBounds.max.x)) + 0.025
         const halfWidth = this.aspect / this.shell.scale.x
         this.fragments.forEach((fragment, i) => {
