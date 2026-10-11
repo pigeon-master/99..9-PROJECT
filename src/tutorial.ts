@@ -41,8 +41,9 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
       for (const key of ['pigeon', 'feed'] as const) dialog.querySelector<HTMLImageElement>(`[data-preview="${key}"]`)!.src = previews[key]
       previewsReady = true
     }
-    move.textContent = touch ? 'TAP + HOLD → MOVE A PIGEON' : 'LEFT CLICK + DRAG → MOVE A PIGEON'
-    feed.replaceChildren(document.createTextNode(touch ? 'TWO-FINGER DRAG → FEED THE PIGEONS' : 'RIGHT CLICK + DRAG →'))
+    move.replaceChildren(document.createTextNode(touch ? 'TAP + HOLD → MOVE A PIGEON' : 'Light Click + Drag →'))
+    if (!touch) move.append(document.createElement('br'), document.createTextNode('MOVE A PIGEON'))
+    feed.replaceChildren(document.createTextNode(touch ? 'TWO-FINGER DRAG → FEED THE PIGEONS' : 'Right Click + Drag →'))
     if (!touch) feed.append(document.createElement('br'), document.createTextNode('FEED THE PIGEONS'))
     beforeOpen()
     dialog.showModal()

@@ -41,7 +41,7 @@ canvas { display: block; touch-action: none; }
   transition: background-color 150ms ease, color 150ms ease;
   user-select: none;
 }
-.help-indicator span { display: block; font-family: inherit; font-weight: 400; transform: scaleX(1.1); }
+.help-indicator span { display: block; font-family: 'OCR B Std', 'ocr-b-std', monospace; font-weight: 400; transform: scaleX(1.1); }
 .help-indicator:hover { background: #000; color: #fff; }
 .help-indicator:focus-visible { outline: 2px solid #888; outline-offset: 4px; }
 .tutorial {

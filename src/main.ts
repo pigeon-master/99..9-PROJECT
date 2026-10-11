@@ -30,7 +30,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <p data-tutorial-feed lang="en"></p>
         </section>
         <p class="tutorial-hint" lang="ko">뭔가 이상한 비둘기는 인내심을 갖고 붙잡고 있으면<br>좋은 일이 생길지도...</p>
-        <p class="tutorial-hint-en" lang="en">Something's weird about some of these pigeons.<br>Hold on to them long enough, and something<br>good might happen...</p>
+        <p class="tutorial-hint-en" lang="en">Something's weird about<br>some of these pigeons.<br>Hold on to them long enough,<br>and something good might happen...</p>
       </div>
     </dialog>
   </main>`
