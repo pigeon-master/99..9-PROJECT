@@ -29,6 +29,37 @@ export interface Pigeon {
 
 const sphere = new THREE.SphereGeometry(1, 24, 18)
 const featherSphere = new THREE.SphereGeometry(1, 10, 6)
+const classicGeometries: THREE.BufferGeometry[] = []
+
+function sameAttribute(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, b: THREE.BufferAttribute | THREE.InterleavedBufferAttribute) {
+  if (!(a instanceof THREE.BufferAttribute) || !(b instanceof THREE.BufferAttribute)) return false
+  if (a.itemSize !== b.itemSize || a.normalized !== b.normalized || a.array.constructor !== b.array.constructor || a.array.byteLength !== b.array.byteLength) return false
+  const first = new Uint8Array(a.array.buffer, a.array.byteOffset, a.array.byteLength)
+  const second = new Uint8Array(b.array.buffer, b.array.byteOffset, b.array.byteLength)
+  for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return false
+  return true
+}
+
+function shareClassicGeometry(root: THREE.Group) {
+  let index = 0
+  root.traverse(object => {
+    if (!(object instanceof THREE.Mesh)) return
+    const geometry = object.geometry, shared = classicGeometries[index++]
+    if (!shared) { classicGeometries.push(geometry); return }
+    const attributes = Object.keys(geometry.attributes)
+    if (geometry.groups.length || shared.groups.length || Object.keys(geometry.morphAttributes).length ||
+      geometry.drawRange.start !== shared.drawRange.start || geometry.drawRange.count !== shared.drawRange.count ||
+      attributes.length !== Object.keys(shared.attributes).length ||
+      !attributes.every(name => shared.attributes[name] && sameAttribute(geometry.attributes[name], shared.attributes[name])) ||
+      (!!geometry.index !== !!shared.index) ||
+      (geometry.index && shared.index && !sameAttribute(geometry.index, shared.index))) return
+    // Every original object/material is still constructed in the same order,
+    // preserving random draws. Only byte-identical, fixed vertex buffers share
+    // storage; animated neck geometry is added afterwards and remains private.
+    object.geometry = shared
+    geometry.dispose()
+  })
+}
 // Fine feather filaments break up the smooth surfaces without external textures.
 const featherCanvas = document.createElement('canvas')
 featherCanvas.width = featherCanvas.height = 256
@@ -208,6 +239,7 @@ export function createPigeon(id: number, style: Pigeon['style'] = 'classic'): Pi
   if (style === 'maid') dressMaid(body, neck, legs, wings)
   const walker = style === 'walker' ? createBabyWalker(root) : null
   batchDetails(root)
+  if (style === 'classic') shareClassicGeometry(root)
   const neckBridge = createFlexibleNeck(iridescence)
   if (style === 'magic' || style === 'maid') neckBridge.userData.radiusScale = 0.85
   body.add(neckBridge)

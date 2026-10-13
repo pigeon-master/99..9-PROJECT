@@ -31,6 +31,9 @@ export class EggFocus {
   private floorMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShadowMaterial> | null = null
   private focusedMaterial: THREE.MeshStandardMaterial | null = null
   private growingCracks: Array<{ group: THREE.Group; age: number }> = []
+  private readonly hitRay = new THREE.Raycaster()
+  private readonly hatchlingBounds = new THREE.Box3()
+  private readonly shellHits: THREE.Intersection[] = []
   get broken() { return this.fragmentRoot !== null }
   get hitCount() { return Number(this.egg?.mesh.userData.hits ?? 0) }
   get awaitingJuniorClick() { return this.hatchling !== null && this.greetingAge === null }
@@ -40,11 +43,11 @@ export class EggFocus {
     if (!this.hatchling) return false
     this.scene.updateMatrixWorld(true)
     this.camera.updateMatrixWorld(true)
-    const ray = new THREE.Raycaster()
+    const ray = this.hitRay
     ray.setFromCamera(pointer, this.camera)
     // Treat the whole chick and its crown as one target, including the small
     // gaps between crown points, thin wings, and sparse down.
-    const bounds = new THREE.Box3().setFromObject(this.hatchling).expandByScalar(0.02)
+    const bounds = this.hatchlingBounds.setFromObject(this.hatchling).expandByScalar(0.02)
     return ray.ray.intersectsBox(bounds)
   }
 
@@ -165,18 +168,20 @@ export class EggFocus {
   hit(pointer: THREE.Vector2) {
     if (!this.shell || this.broken) return false
     this.camera.updateMatrixWorld(true)
-    const ray = new THREE.Raycaster()
+    const ray = this.hitRay
     ray.setFromCamera(pointer, this.camera)
-    return ray.intersectObject(this.shell, false).length > 0
+    this.shellHits.length = 0
+    return ray.intersectObject(this.shell, false, this.shellHits).length > 0
   }
 
   crack(pointer = new THREE.Vector2(0, 0)) {
     if (!this.ready || !this.shell || !this.egg || this.broken) return
     this.camera.updateMatrixWorld(true)
     this.shell.updateMatrixWorld(true)
-    const ray = new THREE.Raycaster()
+    const ray = this.hitRay
     ray.setFromCamera(pointer, this.camera)
-    const hit = ray.intersectObject(this.shell, false)[0]
+    this.shellHits.length = 0
+    const hit = ray.intersectObject(this.shell, false, this.shellHits)[0]
     if (!hit) return
     const impact = this.shell.worldToLocal(hit.point.clone())
     this.egg.mesh.userData.hits = this.hitCount + 1
@@ -335,6 +340,20 @@ export class EggFocus {
         }
         this.egg.mesh.parent?.add(remains)
         this.egg.mesh.removeFromParent()
+        // Original and focus cracks share these resources. Both disappear
+        // after a broken shell is replaced with its independent ground pieces.
+        const geometries = new Set<THREE.BufferGeometry>()
+        const materials = new Set<THREE.Material>()
+        for (const child of [...this.egg.mesh.children]) if (child.name.startsWith('egg-impact-')) {
+          child.traverse(object => {
+            if (!(object instanceof THREE.Mesh)) return
+            geometries.add(object.geometry)
+            for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material)
+          })
+          child.removeFromParent()
+        }
+        geometries.forEach(geometry => geometry.dispose())
+        materials.forEach(material => material.dispose())
       }
     }
     this.growingCracks.forEach(({ group }) => group.traverse(object => {
@@ -350,6 +369,7 @@ export class EggFocus {
     this.focusedMaterial?.dispose(); this.focusedMaterial = null
     if (this.shell) this.scene.remove(this.shell)
     this.shell = null
+    this.shellHits.length = 0
     this.egg = null
     this.greetingAge = null
   }

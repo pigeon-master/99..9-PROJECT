@@ -36,6 +36,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   </main>`
 
 const container = document.querySelector<HTMLDivElement>('#scene')!
+const helpIndicator = document.querySelector<HTMLButtonElement>('.help-indicator')!
 const scene = new THREE.Scene()
 scene.background = new THREE.Color('#ffffff')
 const camera = new THREE.OrthographicCamera()
@@ -86,6 +87,12 @@ for (let i = 0; i < population; i++) {
   const bird = createPigeon(i, style)
   scene.add(bird.root)
   allBirds.push(bird)
+  // Start common shader compilation while the remaining models are built.
+  // Unsupported browsers keep the normal rendering path; no frame or input
+  // is deferred, and the same lights/materials are used for the first draw.
+  if (i === 0 && renderer.extensions.has('KHR_parallel_shader_compile')) {
+    void renderer.compileAsync(bird.root, camera, scene).catch(() => { /* First render remains the fallback. */ })
+  }
   // Measure once, not once per frame; allow for animated heads and wings.
   bird.root.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(bird.root)
@@ -147,6 +154,8 @@ function resize() {
   camera.lookAt(0, 0, 0)
   Object.assign(camera, { near: 0.1, far: Math.max(100, camera.position.length() * 2 + halfHeight * 2 / 0.65) })
   updateCameraView()
+  const pixelRatio = Math.min(devicePixelRatio, 2)
+  if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio)
   renderer.setSize(width, height)
   eggFocus.resize(width, height)
   const oldX = boundsX, oldZ = boundsZ
@@ -322,10 +331,13 @@ setupTouchGestures(renderer.domElement, {
 resize()
 
 let previous = performance.now()
+let animationFrame = 0
+let contextLost = false
 let elapsed = 0
 const struggleAmounts = new WeakMap<Pigeon, number>()
 const peckAmounts = new WeakMap<Pigeon, number>()
 function animate(now: number) {
+  if (document.hidden || contextLost) { animationFrame = 0; return }
   // Coalesce pointer events into one cheap camera update per rendered frame.
   // Zoom never rebuilds the canvas or changes flock routes, bounds or positions.
   if (pendingZoom !== null) {
@@ -407,10 +419,27 @@ function animate(now: number) {
   holdEffects.update(held, realDt)
   eggFocus.update(realDt)
   royalReward.update()
-  document.querySelector<HTMLButtonElement>('.help-indicator')!.disabled = eggFocus.awaitingJuniorClick || royalReward.active
+  const helpDisabled = eggFocus.awaitingJuniorClick || royalReward.active
+  if (helpIndicator.disabled !== helpDisabled) helpIndicator.disabled = helpDisabled
   updateHover()
   eggFocus.background.render(renderer, scene, camera)
   eggFocus.render(renderer)
-  requestAnimationFrame(animate)
+  animationFrame = requestAnimationFrame(animate)
 }
-requestAnimationFrame(animate)
+function pauseAnimation() {
+  cancelAnimationFrame(animationFrame)
+  animationFrame = 0
+}
+function resumeAnimation() {
+  if (document.hidden || contextLost || animationFrame) return
+  // Preserve the simulation state while suspended; do not feed the hidden
+  // interval into hold timers, rolling physics or the egg focus on return.
+  previous = performance.now()
+  animationFrame = requestAnimationFrame(animate)
+}
+document.addEventListener('visibilitychange', () => document.hidden ? pauseAnimation() : resumeAnimation())
+window.addEventListener('pagehide', pauseAnimation)
+window.addEventListener('pageshow', resumeAnimation)
+renderer.domElement.addEventListener('webglcontextlost', () => { contextLost = true; pauseAnimation() })
+renderer.domElement.addEventListener('webglcontextrestored', () => { contextLost = false; resumeAnimation() })
+animationFrame = requestAnimationFrame(animate)

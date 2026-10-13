@@ -61,5 +61,10 @@ export function setupTouchGestures(canvas: HTMLCanvasElement, actions: Actions) 
   }
   canvas.addEventListener('pointerup', end, { capture: true })
   canvas.addEventListener('pointercancel', end, { capture: true })
+  canvas.addEventListener('lostpointercapture', event => {
+    // Normal pointerup already removed the touch. If the browser revokes
+    // capture independently, clear that finger just as on pointercancel.
+    if (touches.has(event.pointerId)) end(event)
+  }, { capture: true })
   window.addEventListener('blur', () => { touches.clear(); mode = null; suppressed = false; actions.release() })
 }

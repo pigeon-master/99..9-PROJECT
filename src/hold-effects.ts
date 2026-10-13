@@ -31,6 +31,8 @@ export class HoldEffects {
   private dropRemainder = 0
   private freeDrops: THREE.Mesh[] = []
   private outlet = new THREE.Vector3()
+  private supportPoint = new THREE.Vector3()
+  private supportCache = new WeakMap<THREE.Mesh, { x: number; y: number; z: number; w: number; scale: number; height: number }>()
   private dropGeometry = new THREE.SphereGeometry(1, 10, 8)
   private liquid = new THREE.MeshPhysicalMaterial({ color: '#eee2bd', roughness: 0.19, clearcoat: 1, clearcoatRoughness: 0.12 })
   private eggMaterial = new THREE.MeshStandardMaterial({ color: '#ece1ca', roughness: 0.65 })
@@ -329,14 +331,21 @@ export class HoldEffects {
   }
 
   private eggSupport(mesh: THREE.Mesh) {
+    const q = mesh.quaternion, scale = mesh.scale.y
+    const cached = this.supportCache.get(mesh)
+    if (cached && cached.x === q.x && cached.y === q.y && cached.z === q.z && cached.w === q.w && cached.scale === scale) return cached.height
     // Use actual vertices to keep the asymmetric shell on the floor as it rolls.
     const positions = this.eggGeometry.getAttribute('position')
-    const point = new THREE.Vector3()
+    const point = this.supportPoint
     let minY = Infinity
     for (let i = 0; i < positions.count; i++) {
       point.fromBufferAttribute(positions, i).applyQuaternion(mesh.quaternion)
       minY = Math.min(minY, point.y)
     }
-    return -minY * mesh.scale.y + 0.003
+    const height = -minY * scale + 0.003
+    if (cached) {
+      cached.x = q.x; cached.y = q.y; cached.z = q.z; cached.w = q.w; cached.scale = scale; cached.height = height
+    } else this.supportCache.set(mesh, { x: q.x, y: q.y, z: q.z, w: q.w, scale, height })
+    return height
   }
 }

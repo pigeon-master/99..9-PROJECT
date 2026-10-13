@@ -5,6 +5,14 @@ import { defineConfig } from 'vite'
 export default defineConfig(({ command }) => ({
   // Relative asset URLs work both at a GitHub Pages project path and locally.
   base: './',
+  build: {
+    // Keep the unchanged renderer cached across application-only deployments.
+    rollupOptions: {
+      output: {
+        manualChunks(id) { if (id.replaceAll('\\', '/').includes('/node_modules/three/')) return 'three' },
+      },
+    },
+  },
   ...(command === 'serve' ? {
     server: {
       host: true,

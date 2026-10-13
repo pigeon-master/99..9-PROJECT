@@ -27,6 +27,7 @@ export class Feeding {
   readonly mesh: THREE.InstancedMesh
   private searches = new WeakMap<Pigeon, number>()
   private returning = new Set<Pigeon>()
+  private boundsCache = new WeakMap<Pigeon, MovementBounds>()
   private dirty = true
   private dummy = new THREE.Object3D()
   private grainColor = new THREE.Color()
@@ -108,23 +109,25 @@ export class Feeding {
   getBounds(bird: Pigeon, boundsX: number, boundsZ: number): MovementBounds {
     const limits = getMovementBounds(bird, boundsX, boundsZ)
     const meal = this.meals.get(bird)
-    if (!meal && this.returning.has(bird)) {
+    if (!meal && !this.returning.has(bird)) return limits
+    let result = this.boundsCache.get(bird)
+    if (!result) { result = { ...limits }; this.boundsCache.set(bird, result) }
+    if (!meal) {
       const pos = bird.root.position
-      return {
-        minX: Math.min(limits.minX, pos.x), maxX: Math.max(limits.maxX, pos.x),
-        minZ: Math.min(limits.minZ, pos.z), maxZ: Math.max(limits.maxZ, pos.z),
-      }
+      result.minX = Math.min(limits.minX, pos.x); result.maxX = Math.max(limits.maxX, pos.x)
+      result.minZ = Math.min(limits.minZ, pos.z); result.maxZ = Math.max(limits.maxZ, pos.z)
+      return result
     }
     if (!meal) return limits
     // Feeding may cross the silhouette margin, only as far as its chosen
     // standing position. Wandering still uses the original screen limits.
-    return {
-      minX: Math.min(limits.minX, meal.x - 0.15), maxX: Math.max(limits.maxX, meal.x + 0.15),
-      minZ: Math.min(limits.minZ, meal.z - 0.15), maxZ: Math.max(limits.maxZ, meal.z + 0.15),
-    }
+    result.minX = Math.min(limits.minX, meal.x - 0.15); result.maxX = Math.max(limits.maxX, meal.x + 0.15)
+    result.minZ = Math.min(limits.minZ, meal.z - 0.15); result.maxZ = Math.max(limits.maxZ, meal.z + 0.15)
+    return result
   }
 
   private findMeal(bird: Pigeon) {
+    if (this.areas.size === 0) return
     const pos = bird.root.position
     // Assign under-served stretches first, including stretches across the screen.
     // Reservations count birds already approaching, not just birds eating there.

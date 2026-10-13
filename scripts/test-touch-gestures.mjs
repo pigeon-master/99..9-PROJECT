@@ -63,6 +63,15 @@ touch('pointercancel', 1, 100, 240)
 touch('pointercancel', 2, 200, 240)
 assert.equal(canvas.captures.size, 0)
 
+touch('pointerdown', 1, 100, 200)
+touch('pointerdown', 2, 200, 200)
+touch('lostpointercapture', 1, 100, 200)
+touch('lostpointercapture', 2, 200, 200)
+assert.equal(canvas.captures.size, 0, 'Unexpected capture loss cleans up both fingers')
+const feedAfterCaptureLoss = feed.length
+touch('pointermove', 1, 100, 300)
+assert.equal(feed.length, feedAfterCaptureLoss, 'A lost finger cannot keep scattering feed')
+
 blocked = true
 const previousFeed = feed.length
 touch('pointerdown', 1, 100, 200)

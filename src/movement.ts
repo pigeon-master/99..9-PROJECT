@@ -5,6 +5,7 @@ interface Route { x: number; z: number; age: number }
 const routes = new WeakMap<Walker, Route>()
 export interface MovementBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 const movementBounds = new WeakMap<Walker, MovementBounds>()
+const positionSnapshots = new WeakMap<Walker[], Array<{ x: number; z: number; y: number }>>()
 export function setMovementBounds(bird: Walker, bounds: MovementBounds) { movementBounds.set(bird, bounds); routes.delete(bird) }
 export function getMovementBounds(bird: Walker, x: number, z: number): MovementBounds {
   return movementBounds.get(bird) ?? { minX: -x, maxX: x, minZ: -z, maxZ: z }
@@ -61,7 +62,14 @@ export function resetRoute(bird: Walker, boundsX: number, boundsZ: number, birds
 
 export function walkFlock(birds: Walker[], held: Walker | null, boundsX: number, boundsZ: number, dt: number, controlled?: ReadonlySet<Walker>) {
   // Read the same frame for every bird, so array order cannot bias avoidance.
-  const positions = birds.map(bird => ({ x: bird.root.position.x, z: bird.root.position.z, y: bird.root.position.y }))
+  let positions = positionSnapshots.get(birds)
+  if (!positions) { positions = []; positionSnapshots.set(birds, positions) }
+  positions.length = birds.length
+  for (let i = 0; i < birds.length; i++) {
+    const pos = birds[i].root.position
+    const snapshot = positions[i] ?? (positions[i] = { x: 0, z: 0, y: 0 })
+    snapshot.x = pos.x; snapshot.z = pos.z; snapshot.y = pos.y
+  }
   birds.forEach((bird, index) => {
     if (bird === held || controlled?.has(bird) || positions[index].y > 0 || bird.speed <= 0) return
     const pos = positions[index]
