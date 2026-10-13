@@ -5,9 +5,9 @@ export function dressMaid(body: THREE.Group, head: THREE.Group, legs: THREE.Grou
   const black = new THREE.MeshStandardMaterial({ color: '#0e0d11', roughness: 0.78, side: THREE.DoubleSide })
   const white = new THREE.MeshStandardMaterial({ color: '#fff8f3', roughness: 0.72, side: THREE.DoubleSide })
   const stocking = new THREE.MeshStandardMaterial({ color: '#eee1e4', roughness: 0.92 })
-  const hair = new THREE.MeshStandardMaterial({ color: '#493027', roughness: 0.46 })
-  const hairLight = new THREE.MeshStandardMaterial({ color: '#68493c', roughness: 0.42 })
-  const hairShade = new THREE.MeshStandardMaterial({ color: '#2c1c18', roughness: 0.5 })
+  const hair = new THREE.MeshStandardMaterial({ color: '#604237', roughness: 0.46 })
+  const hairLight = new THREE.MeshStandardMaterial({ color: '#805d4d', roughness: 0.42 })
+  const hairShade = new THREE.MeshStandardMaterial({ color: '#3a2721', roughness: 0.5 })
   const gray = new THREE.MeshStandardMaterial({ color: '#85858d', roughness: 0.87 })
   const pearl = new THREE.MeshStandardMaterial({ color: '#eee7d9', roughness: 0.35 })
   function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry, material: THREE.Material) {

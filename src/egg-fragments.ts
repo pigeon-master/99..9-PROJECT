@@ -90,6 +90,7 @@ export function beginFragmentFall(fragments: ShellFragment[], rotation: THREE.Qu
 }
 
 export function updateFragmentFall(fragments: ShellFragment[], floor: number, dt: number) {
+  if (fragments.every(fragment => fragment.settled)) return
   let remaining = Math.min(dt, 0.25)
   while (remaining > 1e-8) {
     const step = Math.min(remaining, 1 / 120)

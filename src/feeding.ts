@@ -18,6 +18,7 @@ interface Meal {
 
 interface FeedArea { x: number; z: number; grains: Grain[]; reserved: number }
 const areaSize = 1.6
+export const feedBiteInterval = 0.216
 const areaKey = (x: number, z: number) => `${Math.floor(x / areaSize)},${Math.floor(z / areaSize)}`
 
 export class Feeding {
@@ -162,7 +163,7 @@ export class Feeding {
           if (blocked) continue
           grain.owner = bird.id
           area.reserved++
-          this.meals.set(bird, { grain, x, z, mode: 'wait', timer: Math.random() * 2, biteTimer: 0.3, age: 0 })
+          this.meals.set(bird, { grain, x, z, mode: 'wait', timer: Math.random() * 2, biteTimer: feedBiteInterval, age: 0 })
           return
         }
       }
@@ -225,7 +226,7 @@ export class Feeding {
       if (meal.mode === 'turn') {
         if (Math.abs(delta) < 0.15) meal.mode = 'run'
       } else if (meal.mode === 'run') {
-        if (distance < 0.13) { meal.mode = 'eat'; meal.biteTimer = 0.3; continue }
+        if (distance < 0.13) { meal.mode = 'eat'; meal.biteTimer = feedBiteInterval; continue }
         let vx = dx / distance, vz = dz / distance
         let ax = 0, az = 0
         for (const other of birds) {
@@ -246,7 +247,7 @@ export class Feeding {
         meal.biteTimer -= dt
         if (meal.biteTimer <= 0) {
           meal.grain.bites--
-          meal.biteTimer += 0.3
+          meal.biteTimer += feedBiteInterval
           this.dirty = true
           if (meal.grain.bites === 0) this.cancel(bird)
         }

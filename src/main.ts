@@ -2,7 +2,7 @@ import './style.css'
 import * as THREE from 'three'
 import { createPigeon, type Pigeon } from './pigeon'
 import { resetRoute, scatterFlock, walkFlock, setMovementBounds } from './movement'
-import { Feeding } from './feeding'
+import { Feeding, feedBiteInterval } from './feeding'
 import { updateFlexibleNeck } from './neck'
 import { updateBabyWalker } from './walker'
 import { updateRoyalSwing } from './royal-motion'
@@ -379,7 +379,7 @@ function animate(now: number) {
     // A slow hold followed by a fast forward thrust, synchronized with the feet.
     const stride = (phase / Math.PI) % 1
     const bob = stride < 0.72 ? 0.12 - stride * 0.31 : -0.103 + (stride - 0.72) / 0.28 * 0.223
-    const peckPulse = meal?.mode === 'eat' ? (1 + Math.cos(meal.biteTimer / 0.3 * Math.PI * 2)) / 2 : 0
+    const peckPulse = meal?.mode === 'eat' ? (1 + Math.cos(meal.biteTimer / feedBiteInterval * Math.PI * 2)) / 2 : 0
     bird.neck.position.y = -peck * (0.74 + peckPulse * 0.1)
     bird.neck.position.z = THREE.MathUtils.damp(bird.neck.position.z, peck > 0.01 ? -peck * (0.72 + peckPulse * 0.08 - (bird.walker ? 0.48 : 0)) : walking ? bob : 0, 28, dt)
     bird.neck.rotation.x = (1 - struggle) * 0.02 * Math.sin(phase) + struggle * (-0.15 + Math.sin(flutter * 0.65) * 0.09)

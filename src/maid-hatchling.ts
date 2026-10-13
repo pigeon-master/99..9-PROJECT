@@ -58,7 +58,7 @@ function createSmoothJuniorHair(headwear: THREE.Group) {
   for (const child of [...hairstyle.children]) {
     if (child instanceof THREE.Mesh) { hairstyle.remove(child); child.geometry.dispose() }
   }
-  const brown = new THREE.MeshStandardMaterial({ color: '#493027', roughness: 0.65, side: THREE.DoubleSide })
+  const brown = new THREE.MeshStandardMaterial({ color: '#604237', roughness: 0.65, side: THREE.DoubleSide })
   const add = (geometry: THREE.BufferGeometry, name: string) => {
     const mesh = new THREE.Mesh(geometry, brown)
     mesh.name = name; mesh.castShadow = mesh.receiveShadow = true; hairstyle.add(mesh); return mesh

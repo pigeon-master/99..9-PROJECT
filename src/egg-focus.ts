@@ -26,6 +26,8 @@ export class EggFocus {
   private floorHeight = 0
   private hatchling: THREE.Group | null = null
   private greetingAge: number | null = null
+  private idleAge = 0
+  private readonly idleRotation = new THREE.Quaternion()
   private hatchScale = 0.35
   private floorRoot: THREE.Group | null = null
   private floorMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShadowMaterial> | null = null
@@ -41,7 +43,9 @@ export class EggFocus {
 
   hitHatchling(pointer: THREE.Vector2) {
     if (!this.hatchling) return false
-    this.scene.updateMatrixWorld(true)
+    // Hover only needs the chick and its ancestors, not every shell fragment,
+    // light and crack in the presentation scene.
+    this.hatchling.updateWorldMatrix(true, true)
     this.camera.updateMatrixWorld(true)
     const ray = this.hitRay
     ray.setFromCamera(pointer, this.camera)
@@ -52,7 +56,10 @@ export class EggFocus {
   }
 
   greet() {
-    if (this.awaitingJuniorClick) this.greetingAge = 0
+    if (this.awaitingJuniorClick) {
+      this.hatchling!.quaternion.copy(this.idleRotation)
+      this.greetingAge = 0
+    }
   }
 
   private animateHatchling(age: number, emitTears = true) {
@@ -143,6 +150,7 @@ export class EggFocus {
     this.shell.quaternion.slerpQuaternions(this.startRotation, this.targetRotation, travel)
     this.shell.updateMatrixWorld(true)
     for (const crack of this.growingCracks) {
+      if (crack.age >= 0.28) continue
       crack.age += dt
       crack.group.traverse(object => {
         if (object instanceof THREE.Mesh) object.geometry.setDrawRange(0, Math.floor(Math.min(1, crack.age / 0.28) * object.geometry.index!.count / 3) * 3)
@@ -150,10 +158,14 @@ export class EggFocus {
     }
     if (this.fragmentRoot) {
       if (this.hatchling) {
-        // Stay in the exact newborn pose until a separate click calls greet().
+        // Only a gentle idle sway runs before the explicit action click.
         if (this.greetingAge !== null) {
           this.greetingAge += Math.min(dt, 0.05)
           this.animateHatchling(this.greetingAge)
+        } else {
+          this.idleAge += Math.min(dt, 0.05)
+          this.hatchling.quaternion.copy(this.idleRotation)
+          this.hatchling.rotateZ(Math.sin(this.idleAge * 2.6) * 0.035)
         }
       }
       this.fragmentRoot.position.copy(this.shell.position)
@@ -248,6 +260,8 @@ export class EggFocus {
         this.hatchling = this.egg.mesh.userData.parentStyle === 'royal' ? createRoyalHatchling()
           : this.egg.mesh.userData.parentStyle === 'maid' ? createMaidHatchling() : createBabyHatchling()
         this.greetingAge = null
+        this.idleAge = 0
+        this.idleRotation.copy(this.hatchling.quaternion)
         this.hatchScale = Math.min(0.35, 0.95 / (1.2 * this.shell.scale.y))
         this.hatchling.position.set(0, this.floorHeight, 0.14)
         this.hatchling.scale.setScalar(this.hatchScale)
@@ -260,6 +274,13 @@ export class EggFocus {
           rotation: object.quaternion.clone(), scale: object.scale.clone(), visible: object.visible }))
         this.hatchling.updateWorldMatrix(true, true)
         newbornBounds.setFromObject(this.hatchling, true)
+        for (const tilt of [-0.035, 0.035]) {
+          this.hatchling.quaternion.copy(this.idleRotation)
+          this.hatchling.rotateZ(tilt)
+          this.hatchling.updateWorldMatrix(true, true)
+          newbornBounds.union(new THREE.Box3().setFromObject(this.hatchling, true))
+        }
+        this.hatchling.quaternion.copy(this.idleRotation)
         for (const age of [0, 0.35, 0.55, 0.85, 1.2, 2.3]) {
           this.animateHatchling(age, false)
           this.hatchling.updateWorldMatrix(true, true)

@@ -170,7 +170,9 @@ const thirdCount = focus.hitCount
 if (idleChick) {
   for (let i = 0; i < 25; i++) focus.hitHatchling(new THREE.Vector2(0, 0))
   focus.update(2)
-  assert.deepEqual(snapshotPose(idleChick), idlePose, 'Hatching, waiting and hover detection never start a newborn action')
+  const swayingPose = snapshotPose(idleChick)
+  assert.notDeepEqual(swayingPose[0][2], idlePose[0][2], 'The newborn gently sways before clicking')
+  assert.deepEqual(swayingPose.slice(1), idlePose.slice(1), 'Idle sway never starts the newborn action or changes its props')
   assert.equal(focus.awaitingJuniorClick, true)
   assert.equal(focus.greetingReady, false)
   assert.equal(Math.abs(idleChick.getObjectByName('hatchling-lower-beak').rotation.x), 0, 'Beak stays closed before clicking the newborn')
