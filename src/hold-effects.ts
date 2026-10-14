@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Pigeon } from './pigeon'
+import { trackEvent, characterType } from './analytics.ts'
 
 type EffectBird = Pick<Pigeon, 'style' | 'body'>
 interface Drop { mesh: THREE.Mesh; velocity: THREE.Vector3; radius: number; jet: Jet }
@@ -98,7 +99,10 @@ export class HoldEffects {
       this.outlet.set(0, 0.59, -0.76).applyMatrix4(eligible.body.matrixWorld)
       for (const [index, start] of this.holdBurstStarts.entries()) {
         const overlap = Math.max(0, Math.min(this.holdTime, start + burstDuration) - Math.max(previous, start))
-        if (overlap > 0 && !this.activeJets[index]) this.activeJets[index] = this.createJet()
+        if (overlap > 0 && !this.activeJets[index]) {
+          this.activeJets[index] = this.createJet()
+          trackEvent('pigeon_excretion', { character_type: characterType(eligible.style), burst_number: index + 1 })
+        }
         const jet = this.activeJets[index]
         this.dropRemainder += overlap
         while (jet && this.dropRemainder >= 0.018 - 1e-9) {
@@ -110,6 +114,7 @@ export class HoldEffects {
       if (!this.laidBirds.has(eligible.body) && this.holdTime >= eggTime) {
         this.emitEgg()
         this.laidBirds.add(eligible.body)
+        trackEvent('egg_laid', { character_type: characterType(eligible.style) })
       }
     }
     // Wall time controls the hold; substeps prevent missed floor collisions.

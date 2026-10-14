@@ -4,6 +4,7 @@ import { createEggFragments, beginFragmentFall, updateFragmentFall, type ShellFr
 import { FocusBackground, eggFlightDuration } from './focus-background.ts'
 import { createRoyalHatchling, updateRoyalHatchlingGreeting, createBabyHatchling, updateBabyHatchlingCry, stopBabyHatchlingCry } from './hatchling.ts'
 import { createMaidHatchling, updateMaidHatchlingTea, stopMaidHatchlingTea } from './maid-hatchling.ts'
+import { startInteraction, trackEvent, characterType, type TrackedInteraction } from './analytics.ts'
 
 // Camera-space presentation keeps the egg centered on resize and prevents the
 // enlarged shell from intersecting the floor or the flock behind it.
@@ -36,6 +37,7 @@ export class EggFocus {
   private readonly hitRay = new THREE.Raycaster()
   private readonly hatchlingBounds = new THREE.Box3()
   private readonly shellHits: THREE.Intersection[] = []
+  private tracking: TrackedInteraction | null = null
   get broken() { return this.fragmentRoot !== null }
   get hitCount() { return Number(this.egg?.mesh.userData.hits ?? 0) }
   get awaitingJuniorClick() { return this.hatchling !== null && this.greetingAge === null }
@@ -85,7 +87,7 @@ export class EggFocus {
 
   get ready() { return this.egg !== null && this.elapsed >= eggFlightDuration }
 
-  open(egg: Egg, worldCamera: THREE.OrthographicCamera) {
+  open(egg: Egg, worldCamera: THREE.OrthographicCamera, inputMethod = 'unknown') {
     if (this.egg || !egg.landed) return
     this.egg = egg
     this.background.amount = 0
@@ -110,6 +112,7 @@ export class EggFocus {
     egg.mesh.visible = false
     this.elapsed = 0
     this.fit()
+    this.tracking = startInteraction('egg_focus', { character_type: characterType(egg.mesh.userData.parentStyle), input_method: inputMethod })
   }
 
   resize(width: number, height: number) {
@@ -197,6 +200,7 @@ export class EggFocus {
     if (!hit) return
     const impact = this.shell.worldToLocal(hit.point.clone())
     this.egg.mesh.userData.hits = this.hitCount + 1
+    trackEvent('egg_crack', { character_type: characterType(this.egg.mesh.userData.parentStyle), hit_count: this.hitCount })
     this.egg.cracked = true
     const cracks = new THREE.Group()
     cracks.name = `egg-impact-${this.hitCount}`
@@ -266,6 +270,7 @@ export class EggFocus {
         this.hatchling.position.set(0, this.floorHeight, 0.14)
         this.hatchling.scale.setScalar(this.hatchScale)
         this.floorRoot.add(this.hatchling)
+        trackEvent('egg_hatched', { character_type: characterType(this.egg.mesh.userData.parentStyle) })
         // Reserve the chick's complete silhouette in both resting and greeting
         // poses. Shell pieces stay to either side, even while they tumble.
         const newbornBounds = new THREE.Box3()
@@ -324,7 +329,9 @@ export class EggFocus {
     }
   }
 
-  close() {
+  close(reason = 'closed') {
+    this.tracking?.end({ end_reason: reason, hit_count: this.hitCount, result: this.broken ? 'completed' : 'interrupted' })
+    this.tracking = null
     if (this.egg) {
       this.egg.selected = false
       this.egg.mesh.visible = !this.broken

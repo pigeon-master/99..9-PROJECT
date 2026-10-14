@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Pigeon } from './pigeon'
 import { getMovementBounds, type MovementBounds } from './movement.ts'
+import { trackEvent } from './analytics.ts'
 
 interface Grain {
   x: number; z: number; bites: number; size: number; angle: number; owner: number | null
@@ -30,6 +31,8 @@ export class Feeding {
   private returning = new Set<Pigeon>()
   private boundsCache = new WeakMap<Pigeon, MovementBounds>()
   private dirty = true
+  private grainsSinceClear = 0
+  private feedStarted = 0
   private dummy = new THREE.Object3D()
   private grainColor = new THREE.Color()
   private capacity = 4000
@@ -47,6 +50,7 @@ export class Feeding {
   }
 
   scatter(x: number, z: number, boundsX: number, boundsZ: number, minZ = -boundsZ) {
+    let added = 0
     // Reuse consumed slots; a long drag cannot allocate an unbounded grain mesh.
     for (let i = this.grains.length - 1; i >= 0; i--) if (this.grains[i].bites <= 0) this.grains.splice(i, 1)
     for (let i = 0; i < 26 && this.grains.length < this.capacity; i++) {
@@ -61,8 +65,12 @@ export class Feeding {
         startX: x, startZ: z, height, velocityY, age: 0,
         flightTime: (velocityY + Math.sqrt(velocityY ** 2 + 24 * height)) / 12,
       })
+      added++
     }
     this.dirty = true
+    if (added > 0 && this.grainsSinceClear === 0) this.feedStarted = performance.now()
+    this.grainsSinceClear += added
+    return added
   }
 
   cancel(bird: Pigeon) {
@@ -287,6 +295,10 @@ export class Feeding {
       this.mesh.setMatrixAt(index, this.dummy.matrix)
       this.mesh.setColorAt(index, this.grainColor.setHSL(0.105 + grain.size * 0.02, 0.48, 0.43 + grain.size * 0.12))
       index++
+    }
+    if (index === 0 && this.mesh.count > 0) {
+      trackEvent('feed_cleared', { grains_count: this.grainsSinceClear, duration_ms: Math.max(0, Math.round(performance.now() - this.feedStarted)) })
+      this.grainsSinceClear = 0
     }
     this.mesh.count = index
     this.mesh.instanceMatrix.needsUpdate = true

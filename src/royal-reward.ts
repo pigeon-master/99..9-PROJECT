@@ -1,5 +1,6 @@
 import type { EggFocus } from './egg-focus'
 import greetingUrl from './royal-greeting.svg'
+import { startInteraction, trackEvent, characterType, type TrackedInteraction } from './analytics.ts'
 
 export const shopUrl = 'https://www.crappyroom.shop'
 
@@ -12,6 +13,9 @@ export class RoyalReward {
   private timers: ReturnType<typeof setTimeout>[] = []
   private readonly focus: EggFocus
   private announced = false
+  private character = 'unknown'
+  private actionTracking: TrackedInteraction | null = null
+  private rewardTracking: TrackedInteraction | null = null
   active = false
 
   constructor(focus: EggFocus) {
@@ -33,7 +37,7 @@ export class RoyalReward {
     this.overlay.querySelector('button')!.addEventListener('click', () => this.close())
   }
 
-  start() {
+  start(inputMethod = 'unknown') {
     if (this.active || !this.focus.awaitingJuniorClick) return
     this.active = true
     const royal = this.focus.egg?.mesh.userData.parentStyle === 'royal'
@@ -42,6 +46,8 @@ export class RoyalReward {
       : this.focus.egg?.mesh.userData.parentStyle === 'maid' ? '메이드 주니어 할인 코드' : '아기 비둘기 할인 코드')
     this.focus.greet()
     this.overlay.hidden = false
+    this.character = characterType(this.focus.egg?.mesh.userData.parentStyle)
+    this.actionTracking = startInteraction('junior_action', { character_type: this.character, input_method: inputMethod })
   }
 
   update() {
@@ -49,25 +55,34 @@ export class RoyalReward {
     if (!this.active || this.announced || !this.focus.greetingReady) return
     this.announced = true
     this.overlay.classList.add('greeting')
+    if (this.character === 'royal') trackEvent('royal_greeting_shown', { character_type: this.character })
     this.timers.push(setTimeout(() => this.overlay.classList.add('fading'), 1450))
     this.timers.push(setTimeout(() => {
       this.overlay.classList.add('discount')
+      this.actionTracking?.end({ result: 'completed', end_reason: 'reward_shown' })
+      this.actionTracking = null
+      this.rewardTracking = startInteraction('reward', { character_type: this.character })
       this.overlay.querySelector<HTMLButtonElement>('button')!.focus({ preventScroll: true })
     }, 1800))
     this.timers.push(setTimeout(() => {
       // Keep this shortly after the user's click, within transient activation.
       window.open(shopUrl, '_blank', 'noopener,noreferrer')
+      trackEvent('shop_open_attempt', { character_type: this.character, link_url: shopUrl })
     }, 2600))
   }
 
   close() {
+    this.actionTracking?.end({ result: 'interrupted', end_reason: 'closed' })
+    this.actionTracking = null
+    this.rewardTracking?.end({ end_reason: 'closed' })
+    this.rewardTracking = null
     this.timers.forEach(clearTimeout)
     this.timers = []
     this.active = false
     this.announced = false
     this.overlay.hidden = true
     this.overlay.classList.remove('greeting', 'fading', 'discount')
-    this.focus.close()
+    this.focus.close('reward_closed')
     this.focus.background.amount = 0
   }
 }

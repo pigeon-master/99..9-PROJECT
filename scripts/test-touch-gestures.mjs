@@ -24,12 +24,15 @@ class Canvas extends EventTarget {
 const canvas = new Canvas()
 let zoom = 1, releases = 0, blocked = false
 const feed = []
+const gestures = []
 setupTouchGestures(canvas, {
   blocked: () => blocked,
   release: () => releases++,
   zoom: () => zoom,
   setZoom: value => { zoom = value },
   feed: (x, y, start) => feed.push({ x, y, start }),
+  gestureStart: mode => gestures.push(['start', mode]),
+  gestureEnd: (mode, reason) => gestures.push(['end', mode, reason]),
 })
 function touch(type, id, x, y) {
   const event = new Event(type, { cancelable: true })
@@ -43,11 +46,13 @@ assert.equal(releases, 1, 'A second finger releases a held pigeon')
 touch('pointermove', 1, 70, 200)
 touch('pointermove', 2, 230, 200)
 assert.equal(zoom, 1.6)
+assert.equal(gestures.filter(event => event[0] === 'start' && event[1] === 'pinch').length, 1)
 assert.equal(feed.length, 0, 'Pinching must never scatter feed')
 touch('pointerup', 2, 230, 200)
 touch('pointermove', 1, 80, 230)
 assert.equal(zoom, 1.6, 'A remaining finger cannot continue a two-finger gesture')
 touch('pointerup', 1, 80, 230)
+assert.equal(gestures.filter(event => event[0] === 'end' && event[1] === 'pinch').length, 1)
 
 touch('pointerdown', 1, 100, 200)
 touch('pointerdown', 2, 200, 200)
@@ -62,6 +67,8 @@ assert.equal(zoom, 1.6, 'Feeding does not change zoom')
 touch('pointercancel', 1, 100, 240)
 touch('pointercancel', 2, 200, 240)
 assert.equal(canvas.captures.size, 0)
+assert.equal(gestures.filter(event => event[0] === 'start' && event[1] === 'feed').length, 1)
+assert.equal(gestures.filter(event => event[0] === 'end' && event[1] === 'feed').length, 1)
 
 touch('pointerdown', 1, 100, 200)
 touch('pointerdown', 2, 200, 200)

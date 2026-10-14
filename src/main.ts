@@ -14,6 +14,7 @@ import { setupTutorial } from './tutorial'
 import { createTutorialPreviews } from './tutorial-previews'
 import { flockLayout } from './responsive'
 import { setupTouchGestures } from './touch-gestures'
+import { startInteraction, type TrackedInteraction } from './analytics.ts'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main aria-label="보행기, 메이드, 자르반 비둘기를 포함한 비둘기 100마리가 걸어 다니는 3D 공간">
@@ -133,7 +134,7 @@ function resize() {
   const layout = flockLayout(width, height, matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
   {
     const nextBirds = [...allBirds.filter(b => b.style === 'classic').slice(0, layout.count - specialStyles.length), ...allBirds.filter(b => b.style !== 'classic')]
-    if (nextBirds.length !== birds.length) { release(); scattered = false }
+    if (nextBirds.length !== birds.length) { release('layout_change'); scattered = false }
     for (const bird of allBirds) {
       bird.root.visible = nextBirds.includes(bird)
       if (!bird.root.visible) feeding.cancel(bird)
@@ -194,11 +195,19 @@ const dragOffset = new THREE.Vector3()
 let held: Pigeon | null = null
 let activePointer: number | null = null
 let scattering = false
+let grabTracking: TrackedInteraction | null = null
+let feedTracking: TrackedInteraction | null = null
+let zoomTracking: TrackedInteraction | null = null
+let scatteredGrains = 0, scatterBatches = 0
 let pointerInside = false
 const foodPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const foodPoint = new THREE.Vector3()
 const lastFoodPoint = new THREE.Vector3()
-function dropFood(start = false) {
+function finishFeed(reason: string) {
+  feedTracking?.end({ end_reason: reason, grains_count: scatteredGrains, scatter_batches: scatterBatches })
+  feedTracking = null
+}
+function dropFood(start = false, inputMethod = 'mouse') {
   if (!raycaster.ray.intersectPlane(foodPlane, foodPoint)) return
   const foodX = camera.right - 0.1
   const foodZ = camera.top / viewSin - 0.1
@@ -208,14 +217,21 @@ function dropFood(start = false) {
   foodPoint.x = THREE.MathUtils.clamp(foodPoint.x, -foodX, foodX)
   foodPoint.z = THREE.MathUtils.clamp(foodPoint.z, minFoodZ, foodZ)
   if (start) {
-    feeding.scatter(foodPoint.x, foodPoint.z, foodX, foodZ, minFoodZ)
+    finishFeed('restarted')
+    scatteredGrains = 0; scatterBatches = 0
+    feedTracking = startInteraction('feed_scatter', { input_method: inputMethod })
+    const added = feeding.scatter(foodPoint.x, foodPoint.z, foodX, foodZ, minFoodZ)
+    scatteredGrains += added
+    if (added > 0) scatterBatches++
     lastFoodPoint.copy(foodPoint)
     return
   }
   let distance = lastFoodPoint.distanceTo(foodPoint)
   while (distance >= 0.58) {
     lastFoodPoint.lerp(foodPoint, 0.58 / distance)
-    feeding.scatter(lastFoodPoint.x, lastFoodPoint.z, foodX, foodZ, minFoodZ)
+    const added = feeding.scatter(lastFoodPoint.x, lastFoodPoint.z, foodX, foodZ, minFoodZ)
+    scatteredGrains += added
+    if (added > 0) scatterBatches++
     distance = lastFoodPoint.distanceTo(foodPoint)
   }
 }
@@ -250,9 +266,9 @@ renderer.domElement.addEventListener('pointerdown', event => {
   if (eggFocus.egg) {
     if (event.button === 0 && eggFocus.ready) {
       if (eggFocus.awaitingJuniorClick) {
-        if (eggFocus.hitHatchling(pointer)) royalReward.start()
+        if (eggFocus.hitHatchling(pointer)) royalReward.start(event.pointerType || 'mouse')
       } else if (eggFocus.hit(pointer)) eggFocus.crack(pointer)
-      else eggFocus.close()
+      else eggFocus.close('outside_click')
     }
     return
   }
@@ -262,12 +278,12 @@ renderer.domElement.addEventListener('pointerdown', event => {
     activePointer = event.pointerId
     renderer.domElement.setPointerCapture(event.pointerId)
     renderer.domElement.style.cursor = 'crosshair'
-    dropFood(true)
+    dropFood(true, event.pointerType || 'mouse')
     return
   }
   const target = pick()
   if (target?.kind === 'egg') {
-    eggFocus.open(target.egg, camera)
+    eggFocus.open(target.egg, camera, event.pointerType || 'mouse')
     updateHover()
     return
   }
@@ -280,13 +296,14 @@ renderer.domElement.addEventListener('pointerdown', event => {
   raycaster.ray.intersectPlane(dragPlane, dragPoint)
   dragOffset.copy(held.root.position).sub(dragPoint)
   held.target.copy(held.root.position)
+  grabTracking = startInteraction('pigeon_grab', { character_type: held.style, input_method: event.pointerType || 'mouse' })
   renderer.domElement.style.cursor = 'grabbing'
 })
 renderer.domElement.addEventListener('pointermove', event => {
   if (activePointer !== null && event.pointerId !== activePointer) return
   updatePointer(event)
   if (scattering) {
-    if (!(event.buttons & 2)) { release(); return }
+    if (!(event.buttons & 2)) { release('button_released'); return }
     dropFood()
     return
   }
@@ -298,7 +315,10 @@ renderer.domElement.addEventListener('pointermove', event => {
     }
   } else updateHover()
 })
-function release() {
+function release(reason = 'released') {
+  grabTracking?.end({ end_reason: reason })
+  grabTracking = null
+  finishFeed(reason)
   holdEffects.release()
   scattering = false
   if (held) resetRoute(held, boundsX, boundsZ, birds)
@@ -308,25 +328,35 @@ function release() {
   activePointer = null
   if (id !== null && renderer.domElement.hasPointerCapture(id)) renderer.domElement.releasePointerCapture(id)
 }
-renderer.domElement.addEventListener('pointerup', release)
+renderer.domElement.addEventListener('pointerup', () => release('released'))
 renderer.domElement.addEventListener('contextmenu', event => event.preventDefault())
-renderer.domElement.addEventListener('pointercancel', release)
-renderer.domElement.addEventListener('lostpointercapture', event => { if (event.pointerType !== 'touch') release() })
-window.addEventListener('blur', release)
+renderer.domElement.addEventListener('pointercancel', () => release('cancelled'))
+renderer.domElement.addEventListener('lostpointercapture', event => { if (event.pointerType !== 'touch') release('capture_lost') })
+window.addEventListener('blur', () => release('blur'))
 renderer.domElement.addEventListener('pointerleave', () => {
   pointerInside = false
   holdEffects.eggs.forEach(egg => { egg.hovered = false })
 })
 window.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close()
+  if (event.key === 'Escape' && !eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close('escape')
 })
-setupTutorial(() => { release(); if (!eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close() }, () => createTutorialPreviews(birds.find(b => b.style === 'classic')!))
+setupTutorial(() => { release('tutorial_open'); if (!eggFocus.awaitingJuniorClick && !royalReward.active) eggFocus.close('tutorial_open') }, () => createTutorialPreviews(birds.find(b => b.style === 'classic')!))
 setupTouchGestures(renderer.domElement, {
   blocked: () => !!eggFocus.egg || royalReward.active,
-  release,
+  release: () => release('touch_gesture'),
   zoom: () => pendingZoom ?? viewZoom,
   setZoom: value => { pendingZoom = value },
-  feed: (x, y, start) => { updatePointer({ clientX: x, clientY: y }); dropFood(start) },
+  feed: (x, y, start) => { updatePointer({ clientX: x, clientY: y }); dropFood(start, 'touch') },
+  gestureStart: mode => {
+    if (mode === 'pinch') zoomTracking = startInteraction('pinch_zoom', { input_method: 'touch', zoom_start: pendingZoom ?? viewZoom })
+  },
+  gestureEnd: (mode, reason) => {
+    if (mode === 'feed') finishFeed(reason)
+    else {
+      zoomTracking?.end({ end_reason: reason, zoom_end: THREE.MathUtils.clamp(pendingZoom ?? viewZoom, 0.65, Math.min(2, baseHalfWidth / 3.4, baseHalfHeight / 3.4)) })
+      zoomTracking = null
+    }
+  },
 })
 resize()
 

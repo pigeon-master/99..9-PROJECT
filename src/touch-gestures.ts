@@ -5,6 +5,8 @@ interface Actions {
   zoom(): number
   setZoom(value: number): void
   feed(x: number, y: number, start: boolean): void
+  gestureStart?(mode: 'pinch' | 'feed'): void
+  gestureEnd?(mode: 'pinch' | 'feed', reason: string): void
 }
 
 export function setupTouchGestures(canvas: HTMLCanvasElement, actions: Actions) {
@@ -41,9 +43,11 @@ export function setupTouchGestures(canvas: HTMLCanvasElement, actions: Actions) 
     const travel = Math.hypot(current.center.x - origin.x, current.center.y - origin.y)
     if (mode === 'pending') {
       // Establish intent before feeding, so a pinch never leaves accidental grain.
-      if (separation > Math.max(12, startDistance * 0.08) && separation > travel * 0.9) mode = 'pinch'
+      if (separation > Math.max(12, startDistance * 0.08) && separation > travel * 0.9) {
+        mode = 'pinch'; actions.gestureStart?.('pinch')
+      }
       else if (travel > 9 && separation < Math.max(12, startDistance * 0.08)) {
-        mode = 'feed'; actions.feed(origin.x, origin.y, true)
+        mode = 'feed'; actions.gestureStart?.('feed'); actions.feed(origin.x, origin.y, true)
       }
     }
     if (mode === 'pinch') actions.setZoom(startZoom * current.distance / startDistance)
@@ -54,6 +58,7 @@ export function setupTouchGestures(canvas: HTMLCanvasElement, actions: Actions) 
     touches.delete(event.pointerId)
     if (!suppressed) return
     event.stopImmediatePropagation()
+    if (mode === 'pinch' || mode === 'feed') actions.gestureEnd?.(mode, event.type)
     mode = null
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
     // The remaining finger cannot accidentally pick up a bird after a gesture.
@@ -66,5 +71,8 @@ export function setupTouchGestures(canvas: HTMLCanvasElement, actions: Actions) 
     // capture independently, clear that finger just as on pointercancel.
     if (touches.has(event.pointerId)) end(event)
   }, { capture: true })
-  window.addEventListener('blur', () => { touches.clear(); mode = null; suppressed = false; actions.release() })
+  window.addEventListener('blur', () => {
+    if (mode === 'pinch' || mode === 'feed') actions.gestureEnd?.(mode, 'blur')
+    touches.clear(); mode = null; suppressed = false; actions.release()
+  })
 }

@@ -1,3 +1,5 @@
+import { startInteraction, type TrackedInteraction } from './analytics.ts'
+
 // Lightweight vector illustrations based on the supplied mouse and pointer references.
 function mouseIllustration(side: 'left' | 'right') {
   return `<svg viewBox="0 0 100 140" focusable="false" aria-hidden="true">
@@ -28,6 +30,7 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
   zoom.textContent = 'PINCH → ZOOM IN / OUT'
   feed.closest('section')!.after(zoom)
   let previewsReady = false
+  let tracking: TrackedInteraction | null = null
   for (const side of ['left', 'right'] as const) dialog.querySelector<HTMLElement>(`[data-mouse="${side}"]`)!.innerHTML = mouseIllustration(side)
   button.addEventListener('click', event => {
     const touch = (event instanceof PointerEvent && event.pointerType === 'touch')
@@ -47,6 +50,7 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
     if (!touch) feed.append(document.createElement('br'), document.createTextNode('FEED THE PIGEONS'))
     beforeOpen()
     dialog.showModal()
+    tracking = startInteraction('tutorial', { interface_type: touch ? 'touch' : 'desktop' })
     button.setAttribute('aria-expanded', 'true')
     dialog.focus()
   })
@@ -56,6 +60,8 @@ export function setupTutorial(beforeOpen: () => void, makePreviews: () => { pige
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close()
   })
   dialog.addEventListener('close', () => {
+    tracking?.end({ end_reason: 'closed' })
+    tracking = null
     button.setAttribute('aria-expanded', 'false')
     button.focus({ preventScroll: true })
   })
